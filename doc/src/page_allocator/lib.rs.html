@@ -931,6 +931,11 @@
 <a href="#931" id="931">931</a>
 <a href="#932" id="932">932</a>
 <a href="#933" id="933">933</a>
+<a href="#934" id="934">934</a>
+<a href="#935" id="935">935</a>
+<a href="#936" id="936">936</a>
+<a href="#937" id="937">937</a>
+<a href="#938" id="938">938</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
@@ -965,7 +970,7 @@
 
 </span><span class="kw">use </span>core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
 <span class="kw">use </span>kernel_config::memory::<span class="kw-2">*</span>;
-<span class="kw">use </span>memory_structs::{VirtualAddress, Page, PageRange};
+<span class="kw">use </span>memory_structs::{VirtualAddress, Page, PageRange, PageSize, Page4K, Page2M, Page1G};
 <span class="kw">use </span>spin::{Mutex, Once};
 <span class="kw">use </span>static_array_rb_tree::<span class="kw-2">*</span>;
 
@@ -1073,7 +1078,7 @@
 }
 
 
-<span class="doccomment">/// A range of contiguous pages.
+<span class="doccomment">/// A range of contiguous 4K-sized pages.
 ///
 /// # Ordering and Equality
 ///
@@ -1087,11 +1092,11 @@
 </span><span class="attr">#[derive(Debug, Clone, Eq)]
 </span><span class="kw">struct </span>Chunk {
 	<span class="doccomment">/// The Pages covered by this chunk, an inclusive range. 
-	</span>pages: PageRange,
+	</span>pages: PageRange&lt;Page4K&gt;,
 }
 <span class="kw">impl </span>Chunk {
-	<span class="kw">fn </span>as_allocated_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AllocatedPages {
-		AllocatedPages {
+	<span class="kw">fn </span>as_allocated_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; AllocatedPages&lt;Page4K&gt; {
+		AllocatedPages::&lt;Page4K&gt; {
 			pages: <span class="self">self</span>.pages.clone(),
 		}
 	}
@@ -1099,13 +1104,13 @@
 	<span class="doccomment">/// Returns a new `Chunk` with an empty range of pages. 
 	</span><span class="kw">fn </span>empty() -&gt; Chunk {
 		Chunk {
-			pages: PageRange::empty(),
+			pages: PageRange::&lt;Page4K&gt;::empty(),
 		}
 	}
 }
 <span class="kw">impl </span>Deref <span class="kw">for </span>Chunk {
-    <span class="kw">type </span>Target = PageRange;
-    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
+    <span class="kw">type </span>Target = PageRange&lt;Page4K&gt;;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange&lt;Page4K&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.pages
     }
 }
@@ -1124,8 +1129,8 @@
         <span class="self">self</span>.pages.start() == other.pages.start()
     }
 }
-<span class="kw">impl </span>Borrow&lt;Page&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_ </span>Chunk {
-	<span class="kw">fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+<span class="kw">impl </span>Borrow&lt;Page&lt;Page4K&gt;&gt; <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">&#39;_ </span>Chunk {
+	<span class="kw">fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page&lt;Page4K&gt; {
 		<span class="self">self</span>.pages.start()
 	}
 }
@@ -1138,30 +1143,32 @@
 /// 
 /// This object represents ownership of the allocated virtual pages;
 /// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop. 
-</span><span class="kw">pub struct </span>AllocatedPages {
-	pages: PageRange,
+</span><span class="kw">pub struct </span>AllocatedPages&lt;P: PageSize = Page4K&gt; {
+	pages: PageRange&lt;P&gt;,
 }
 
 <span class="comment">// AllocatedPages must not be Cloneable, and it must not expose its inner pages as mutable.
-</span><span class="macro">assert_not_impl_any!</span>(AllocatedPages: DerefMut, Clone);
+</span><span class="macro">assert_not_impl_any!</span>(AllocatedPages&lt;Page4K&gt;: DerefMut, Clone);
+<span class="macro">assert_not_impl_any!</span>(AllocatedPages&lt;Page2M&gt;: DerefMut, Clone);
+<span class="macro">assert_not_impl_any!</span>(AllocatedPages&lt;Page1G&gt;: DerefMut, Clone);
 
-<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AllocatedPages {
+<span class="kw">impl</span>&lt;P: PageSize&gt; fmt::Debug <span class="kw">for </span>AllocatedPages&lt;P&gt; {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
 		<span class="macro">write!</span>(f, <span class="string">&quot;AllocatedPages({:?})&quot;</span>, <span class="self">self</span>.pages)
 	}
 }
-<span class="kw">impl </span>Default <span class="kw">for </span>AllocatedPages {
-	<span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<span class="kw">impl</span>&lt;P: PageSize&gt; Default <span class="kw">for </span>AllocatedPages&lt;P&gt; {
+	<span class="kw">fn </span>default() -&gt; AllocatedPages&lt;P&gt; {
 		<span class="self">Self</span>::empty()
 	}
 }
 
-<span class="kw">impl </span>AllocatedPages {
+<span class="kw">impl</span>&lt;P: PageSize&gt; AllocatedPages&lt;P&gt; {
 	<span class="doccomment">/// Returns an empty AllocatedPages object that performs no page allocation. 
     /// Can be used as a placeholder, but will not permit any real usage. 
-    </span><span class="kw">pub const fn </span>empty() -&gt; AllocatedPages {
+    </span><span class="kw">pub const fn </span>empty() -&gt; AllocatedPages&lt;P&gt; {
         AllocatedPages {
-			pages: PageRange::empty()
+			pages: PageRange::&lt;P&gt;::empty()
 		}
 	}
 
@@ -1181,17 +1188,17 @@
     }
 
 	<span class="doccomment">/// Returns the starting `Page` in this range of pages.
-	</span><span class="kw">pub const fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+	</span><span class="kw">pub const fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page&lt;P&gt; {
 		<span class="self">self</span>.pages.start()
 	}
 
 	<span class="doccomment">/// Returns the ending `Page` (inclusive) in this range of pages.
-	</span><span class="kw">pub const fn </span>end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+	</span><span class="kw">pub const fn </span>end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page&lt;P&gt; {
 		<span class="self">self</span>.pages.end()
 	}
 
 	<span class="doccomment">/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
-	</span><span class="kw">pub const fn </span>range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
+	</span><span class="kw">pub const fn </span>range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange&lt;P&gt; {
 		<span class="kw-2">&amp;</span><span class="self">self</span>.pages
 	}
 
@@ -1227,12 +1234,12 @@
 	/// that is, `self.end` must equal `ap.start`. 
 	/// If this condition is met, `self` is modified and `Ok(())` is returned,
 	/// otherwise `Err(ap)` is returned.
-	</span><span class="kw">pub fn </span>merge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ap: AllocatedPages) -&gt; <span class="prelude-ty">Result</span>&lt;(), AllocatedPages&gt; {
+	</span><span class="kw">pub fn </span>merge(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ap: AllocatedPages&lt;P&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), AllocatedPages&lt;P&gt;&gt; {
 		<span class="comment">// make sure the pages are contiguous
 		</span><span class="kw">if </span><span class="kw-2">*</span>ap.start() != (<span class="kw-2">*</span><span class="self">self</span>.end() + <span class="number">1</span>) {
 			<span class="kw">return </span><span class="prelude-val">Err</span>(ap);
 		}
-		<span class="self">self</span>.pages = PageRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span>ap.end());
+		<span class="self">self</span>.pages = PageRange::&lt;P&gt;::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span>ap.end());
 		<span class="comment">// ensure the now-merged AllocatedPages doesn&#39;t run its drop handler and free its pages.
 		</span>core::mem::forget(ap); 
 		<span class="prelude-val">Ok</span>(())
@@ -1250,22 +1257,25 @@
     /// Returns an `Err` containing this `AllocatedPages` if `at_page` is otherwise out of bounds.
 	/// 
     /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
-    </span><span class="kw">pub fn </span>split(<span class="self">self</span>, at_page: Page) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, AllocatedPages), AllocatedPages&gt; {
+    </span><span class="kw">pub fn </span>split(
+		<span class="self">self</span>,
+		at_page: Page&lt;P&gt;,
+	) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages&lt;P&gt;, AllocatedPages&lt;P&gt;), AllocatedPages&lt;P&gt;&gt; {
         <span class="kw">let </span>end_of_first = at_page - <span class="number">1</span>;
 
         <span class="kw">let </span>(first, second) = <span class="kw">if </span>at_page == <span class="kw-2">*</span><span class="self">self</span>.start() &amp;&amp; at_page &lt;= <span class="kw-2">*</span><span class="self">self</span>.end() {
-            <span class="kw">let </span>first  = PageRange::empty();
-            <span class="kw">let </span>second = PageRange::new(at_page, <span class="kw-2">*</span><span class="self">self</span>.end());
+            <span class="kw">let </span>first  = PageRange::&lt;P&gt;::empty();
+            <span class="kw">let </span>second = PageRange::&lt;P&gt;::new(at_page, <span class="kw-2">*</span><span class="self">self</span>.end());
             (first, second)
         } 
         <span class="kw">else if </span>at_page == (<span class="kw-2">*</span><span class="self">self</span>.end() + <span class="number">1</span>) &amp;&amp; end_of_first &gt;= <span class="kw-2">*</span><span class="self">self</span>.start() {
-            <span class="kw">let </span>first  = PageRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span><span class="self">self</span>.end()); 
-            <span class="kw">let </span>second = PageRange::empty();
+            <span class="kw">let </span>first  = PageRange::&lt;P&gt;::new(<span class="kw-2">*</span><span class="self">self</span>.start(), <span class="kw-2">*</span><span class="self">self</span>.end()); 
+            <span class="kw">let </span>second = PageRange::&lt;P&gt;::empty();
             (first, second)
         }
         <span class="kw">else if </span>at_page &gt; <span class="kw-2">*</span><span class="self">self</span>.start() &amp;&amp; end_of_first &lt;= <span class="kw-2">*</span><span class="self">self</span>.end() {
-            <span class="kw">let </span>first  = PageRange::new(<span class="kw-2">*</span><span class="self">self</span>.start(), end_of_first);
-            <span class="kw">let </span>second = PageRange::new(at_page, <span class="kw-2">*</span><span class="self">self</span>.end());
+            <span class="kw">let </span>first  = PageRange::&lt;P&gt;::new(<span class="kw-2">*</span><span class="self">self</span>.start(), end_of_first);
+            <span class="kw">let </span>second = PageRange::&lt;P&gt;::new(at_page, <span class="kw-2">*</span><span class="self">self</span>.end());
             (first, second)
         }
         <span class="kw">else </span>{
@@ -1275,19 +1285,19 @@
         <span class="comment">// ensure the original AllocatedPages doesn&#39;t run its drop handler and free its pages.
         </span>core::mem::forget(<span class="self">self</span>);   
         <span class="prelude-val">Ok</span>((
-            AllocatedPages { pages: first }, 
-            AllocatedPages { pages: second },
+            AllocatedPages::&lt;P&gt; { pages: first }, 
+            AllocatedPages::&lt;P&gt; { pages: second },
         ))
     }
 }
 
-<span class="kw">impl </span>Drop <span class="kw">for </span>AllocatedPages {
+<span class="kw">impl</span>&lt;P: PageSize&gt; Drop <span class="kw">for </span>AllocatedPages&lt;P&gt; {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
 		<span class="kw">if </span><span class="self">self</span>.size_in_pages() == <span class="number">0 </span>{ <span class="kw">return</span>; }
 		<span class="comment">// trace!(&quot;page_allocator: deallocating {:?}&quot;, self);
 
 		</span><span class="kw">let </span>chunk = Chunk {
-			pages: <span class="self">self</span>.pages.clone(),
+			pages: <span class="self">self</span>.pages.clone().into_4k_pages(),
 		};
 		<span class="kw">let </span><span class="kw-2">mut </span>list = FREE_PAGE_LIST.lock();
 		<span class="kw">match </span><span class="kw-2">&amp;mut </span>list.<span class="number">0 </span>{
@@ -1385,11 +1395,11 @@
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub enum </span>AllocationError {
 	<span class="doccomment">/// The requested address was not free: it was already allocated, or is outside the range of this allocator.
-	</span>AddressNotFree(Page, usize),
+	</span>AddressNotFree(Page&lt;Page4K&gt;, usize),
 	<span class="doccomment">/// The address space was full, or there was not a large-enough chunk 
 	/// or enough remaining chunks (within the given `PageRange`, if any)
 	/// that could satisfy the requested allocation size.
-	</span>OutOfAddressSpace(usize, <span class="prelude-ty">Option</span>&lt;PageRange&gt;),
+	</span>OutOfAddressSpace(usize, <span class="prelude-ty">Option</span>&lt;PageRange&lt;Page4K&gt;&gt;),
 	<span class="doccomment">/// The allocator has not yet been initialized.
 	</span>NotInitialized,
 }
@@ -1409,9 +1419,9 @@
 /// `requested_page` to `requested_page + num_pages`.
 </span><span class="kw">fn </span>find_specific_chunk(
 	list: <span class="kw-2">&amp;mut </span>StaticArrayRBTree&lt;Chunk&gt;,
-	requested_page: Page,
+	requested_page: Page&lt;Page4K&gt;,
 	num_pages: usize
-) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages&lt;Page4K&gt;, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
 
 	<span class="comment">// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
 	</span><span class="kw">let </span>requested_end_page = requested_page + (num_pages - <span class="number">1</span>); 
@@ -1481,12 +1491,12 @@
 </span><span class="kw">fn </span>find_any_chunk(
 	list: <span class="kw-2">&amp;mut </span>StaticArrayRBTree&lt;Chunk&gt;,
 	num_pages: usize,
-	within_range: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>PageRange&gt;,
+	within_range: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>PageRange&lt;Page4K&gt;&gt;,
 	alignment_4k_pages: usize,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
 	<span class="kw">let </span>designated_low_end = DESIGNATED_PAGES_LOW_END.get()
 		.ok_or(AllocationError::NotInitialized)<span class="question-mark">?</span>;
-	<span class="kw">let </span>full_range = PageRange::new(<span class="kw-2">*</span>designated_low_end + <span class="number">1</span>, DESIGNATED_PAGES_HIGH_START - <span class="number">1</span>);
+	<span class="kw">let </span>full_range = PageRange::&lt;Page4K&gt;::new(<span class="kw-2">*</span>designated_low_end + <span class="number">1</span>, DESIGNATED_PAGES_HIGH_START - <span class="number">1</span>);
 	<span class="kw">let </span>range = within_range.unwrap_or(<span class="kw-2">&amp;</span>full_range);
 
 	<span class="comment">// During the first pass, we only search within the given range.
@@ -1638,11 +1648,11 @@
 /// This function breaks up that chunk into multiple ones and returns an `AllocatedPages` 
 /// from (part of) that chunk, ranging from `start_page` to `start_page + num_pages`.
 </span><span class="kw">fn </span>adjust_chosen_chunk(
-	start_page: Page,
+	start_page: Page&lt;Page4K&gt;,
 	num_pages: usize,
 	chosen_chunk: <span class="kw-2">&amp;</span>Chunk,
 	<span class="kw-2">mut </span>chosen_chunk_ref: ValueRefMut&lt;Chunk&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages&lt;Page4K&gt;, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
 
 	<span class="comment">// The new allocated chunk might start in the middle of an existing chunk,
 	// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
@@ -1651,20 +1661,20 @@
 	// an overlapping duplicate Chunk at either the very minimum or the very maximum of the address space.
 	</span><span class="kw">let </span>new_allocation = Chunk {
 		<span class="comment">// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-		</span>pages: PageRange::new(start_page, start_page + (num_pages - <span class="number">1</span>)),
+		</span>pages: PageRange::&lt;Page4K&gt;::new(start_page, start_page + (num_pages - <span class="number">1</span>)),
 	};
 	<span class="kw">let </span>before = <span class="kw">if </span>start_page == MIN_PAGE {
 		<span class="prelude-val">None
 	</span>} <span class="kw">else </span>{
 		<span class="prelude-val">Some</span>(Chunk {
-			pages: PageRange::new(<span class="kw-2">*</span>chosen_chunk.start(), <span class="kw-2">*</span>new_allocation.start() - <span class="number">1</span>),
+			pages: PageRange::&lt;Page4K&gt;::new(<span class="kw-2">*</span>chosen_chunk.start(), <span class="kw-2">*</span>new_allocation.start() - <span class="number">1</span>),
 		})
 	};
 	<span class="kw">let </span>after = <span class="kw">if </span>new_allocation.end() == <span class="kw-2">&amp;</span>MAX_PAGE { 
 		<span class="prelude-val">None
 	</span>} <span class="kw">else </span>{
 		<span class="prelude-val">Some</span>(Chunk {
-			pages: PageRange::new(<span class="kw-2">*</span>new_allocation.end() + <span class="number">1</span>, <span class="kw-2">*</span>chosen_chunk.end()),
+			pages: PageRange::&lt;Page4K&gt;::new(<span class="kw-2">*</span>new_allocation.end() + <span class="number">1</span>, <span class="kw-2">*</span>chosen_chunk.end()),
 		})
 	};
 
@@ -1703,7 +1713,7 @@
 	/// Note: alignment is specified in number of 4KiB pages, not number of bytes.
 	</span>AlignedTo { alignment_4k_pages: usize },
 	<span class="doccomment">/// The allocated pages can be located anywhere within the given range.
-	</span>WithinRange(<span class="kw-2">&amp;</span><span class="lifetime">&#39;r </span>PageRange),
+	</span>WithinRange(<span class="kw-2">&amp;</span><span class="lifetime">&#39;r </span>PageRange&lt;Page4K&gt;),
 	<span class="doccomment">/// The allocated pages can be located at any virtual address
 	/// and have no special alignment requirements beyond a single page.
 	</span>Any,
@@ -1734,7 +1744,7 @@
 </span><span class="kw">pub fn </span>allocate_pages_deferred(
 	request: AllocationRequest,
 	num_pages: usize,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages&lt;Page4K&gt;, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 	<span class="kw">if </span>num_pages == <span class="number">0 </span>{
 		<span class="macro">warn!</span>(<span class="string">&quot;PageAllocator: requested an allocation of 0 pages... stupid!&quot;</span>);
 		<span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;cannot allocate zero pages&quot;</span>);
@@ -1772,7 +1782,7 @@
 </span><span class="kw">pub fn </span>allocate_pages_by_bytes_deferred(
 	request: AllocationRequest,
 	num_bytes: usize,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages&lt;Page4K&gt;, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 	<span class="kw">let </span>actual_num_bytes = <span class="kw">if let </span>AllocationRequest::AtVirtualAddress(vaddr) = request {
 		num_bytes + (vaddr.value() % PAGE_SIZE)
 	} <span class="kw">else </span>{
@@ -1786,7 +1796,7 @@
 <span class="doccomment">/// Allocates the given number of pages with no constraints on the starting virtual address.
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
-</span><span class="kw">pub fn </span>allocate_pages(num_pages: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&gt; {
+</span><span class="kw">pub fn </span>allocate_pages(num_pages: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&lt;Page4K&gt;&gt; {
 	allocate_pages_deferred(AllocationRequest::Any, num_pages)
 		.map(|(ap, _action)| ap)
 		.ok()
@@ -1798,7 +1808,7 @@
 /// 
 /// This function still allocates whole pages by rounding up the number of bytes. 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
-</span><span class="kw">pub fn </span>allocate_pages_by_bytes(num_bytes: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&gt; {
+</span><span class="kw">pub fn </span>allocate_pages_by_bytes(num_bytes: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&lt;Page4K&gt;&gt; {
 	allocate_pages_by_bytes_deferred(AllocationRequest::Any, num_bytes)
 		.map(|(ap, _action)| ap)
 		.ok()
@@ -1809,7 +1819,7 @@
 /// 
 /// This function still allocates whole pages by rounding up the number of bytes. 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
-</span><span class="kw">pub fn </span>allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages&lt;Page4K&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 	allocate_pages_by_bytes_deferred(AllocationRequest::AtVirtualAddress(vaddr), num_bytes)
 		.map(|(ap, _action)| ap)
 }
@@ -1818,7 +1828,7 @@
 <span class="doccomment">/// Allocates the given number of pages starting at (inclusive of) the page containing the given `VirtualAddress`.
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
-</span><span class="kw">pub fn </span>allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages&lt;Page4K&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 	allocate_pages_deferred(AllocationRequest::AtVirtualAddress(vaddr), num_pages)
 		.map(|(ap, _action)| ap)
 }
@@ -1828,8 +1838,8 @@
 /// they must be within the given inclusive `range` of pages.
 </span><span class="kw">pub fn </span>allocate_pages_in_range(
 	num_pages: usize,
-	range: <span class="kw-2">&amp;</span>PageRange,
-) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	range: <span class="kw-2">&amp;</span>PageRange&lt;Page4K&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages&lt;Page4K&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 	allocate_pages_deferred(AllocationRequest::WithinRange(range), num_pages)
 		.map(|(ap, _action)| ap)
 }
@@ -1839,8 +1849,8 @@
 /// they must be within the given inclusive `range` of pages.
 </span><span class="kw">pub fn </span>allocate_pages_by_bytes_in_range(
 	num_bytes: usize,
-	range: <span class="kw-2">&amp;</span>PageRange,
-) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+	range: <span class="kw-2">&amp;</span>PageRange&lt;Page4K&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages&lt;Page4K&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 	allocate_pages_by_bytes_deferred(AllocationRequest::WithinRange(range), num_bytes)
 		.map(|(ap, _action)| ap)
 }
