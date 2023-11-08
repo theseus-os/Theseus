@@ -633,7 +633,7 @@ assert_not_impl_any!(AllocatedFrame<Page2M>: DerefMut, Clone);
 assert_not_impl_any!(AllocatedFrame<Page1G>: DerefMut, Clone);
 
 /// The result of splitting a `Frames` object into multiple smaller `Frames` objects.
-pub struct SplitFrames<const S: MemoryState, P: PageSize>  {
+pub struct SplitFrames<const S: MemoryState, P: PageSize> {
     before_start:   Option<Frames<S, P>>,
     start_to_end:   Frames<S, P>,
     after_end:      Option<Frames<S, P>>,
