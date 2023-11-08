@@ -17,6 +17,7 @@
 //! or when needed to fulfill a specific request.
 
 #![no_std]
+#![feature(const_trait_impl)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -217,6 +218,11 @@ impl fmt::Debug for AllocatedPages {
 		write!(f, "AllocatedPages({:?})", self.pages)
 	}
 }
+impl Default for AllocatedPages {
+	fn default() -> Self {
+		Self::empty()
+	}
+}
 
 impl AllocatedPages {
 	/// Returns an empty AllocatedPages object that performs no page allocation. 
@@ -228,32 +234,32 @@ impl AllocatedPages {
 	}
 
 	/// Returns the starting `VirtualAddress` in this range of pages.
-    pub fn start_address(&self) -> VirtualAddress {
+    pub const fn start_address(&self) -> VirtualAddress {
         self.pages.start_address()
     }
 
 	/// Returns the size in bytes of this range of pages.
-    pub fn size_in_bytes(&self) -> usize {
+    pub const fn size_in_bytes(&self) -> usize {
         self.pages.size_in_bytes()
     }
 
 	/// Returns the size in number of pages of this range of pages.
-    pub fn size_in_pages(&self) -> usize {
+    pub const fn size_in_pages(&self) -> usize {
         self.pages.size_in_pages()
     }
 
 	/// Returns the starting `Page` in this range of pages.
-	pub fn start(&self) -> &Page {
+	pub const fn start(&self) -> &Page {
 		self.pages.start()
 	}
 
 	/// Returns the ending `Page` (inclusive) in this range of pages.
-	pub fn end(&self) -> &Page {
+	pub const fn end(&self) -> &Page {
 		self.pages.end()
 	}
 
 	/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
-	pub fn range(&self) -> &PageRange {
+	pub const fn range(&self) -> &PageRange {
 		&self.pages
 	}
 
