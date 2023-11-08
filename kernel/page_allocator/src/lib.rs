@@ -230,7 +230,7 @@ impl<P: PageSize> AllocatedPages<P> {
     /// Can be used as a placeholder, but will not permit any real usage. 
     pub const fn empty() -> AllocatedPages<P> {
         AllocatedPages {
-			pages: PageRange::empty()
+			pages: PageRange::<P>::empty()
 		}
 	}
 
