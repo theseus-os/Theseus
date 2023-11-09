@@ -555,6 +555,7 @@ dependencies = [
  "log",
  "memory",
  "sync_spin",
+ "waker",
  "zerocopy",
 ]
 
@@ -1005,6 +1006,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
+name = "draw"
+version = "0.1.0"
+dependencies = [
+ "font",
+ "geometry",
+ "graphics",
+]
+
+[[package]]
 name = "dreadnought"
 version = "0.1.0"
 dependencies = [
@@ -1093,9 +1103,9 @@ dependencies = [
 name = "event_types"
 version = "0.1.0"
 dependencies = [
+ "geometry",
  "keycodes_ascii",
  "mouse_data",
- "shapes",
 ]
 
 [[package]]
@@ -1237,20 +1247,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "framebuffer"
-version = "0.1.0"
-dependencies = [
- "color",
- "early_printer",
- "log",
- "memory",
- "multicore_bringup",
- "page_attribute_table",
- "shapes",
- "zerocopy",
-]
-
-[[package]]
 name = "fs_node"
 version = "0.1.0"
 dependencies = [
@@ -1360,6 +1356,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "geometry"
+version = "0.1.0"
+
+[[package]]
 name = "getopts"
 version = "0.2.21"
 source = "git+https://github.com/theseus-os/getopts#da1e04828d3ecd6adc90e2da61e2e3cccc7ca97c"
@@ -1417,7 +1417,11 @@ dependencies = [
 name = "graphics"
 version = "0.1.0"
 dependencies = [
+ "color",
+ "geometry",
+ "log",
  "memory",
+ "page_attribute_table",
  "zerocopy",
 ]
 
@@ -1807,13 +1811,15 @@ name = "libterm"
 version = "0.1.0"
 dependencies = [
  "color",
+ "compositor",
  "dfqueue",
+ "draw",
  "environment",
  "event_types",
  "font",
+ "geometry",
  "log",
  "root",
- "shapes",
  "time",
 ]
 
@@ -3319,10 +3325,6 @@ dependencies = [
  "digest",
  "keccak",
 ]
-
-[[package]]
-name = "shapes"
-version = "0.1.0"
 
 [[package]]
 name = "shell"

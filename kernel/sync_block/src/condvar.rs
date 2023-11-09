@@ -1,20 +1,31 @@
-use crate::MutexGuard;
-use preemption::hold_preemption_no_timer_disable;
 use mpmc_queue::Queue;
+use preemption::hold_preemption_no_timer_disable;
 use sync::DeadlockPrevention;
 use sync_spin::Spin;
 use task::{get_my_current_task, TaskRef};
+
+use crate::MutexGuard;
 
 /// A condition variable.
 ///
 /// Condition variables represent the ability to block a thread such that it
 /// consumes no CPU time while waiting for an event to occur.
 // TODO: Is there even a point to exposing this generic?
+#[derive(Debug)]
 pub struct Condvar<P = Spin>
 where
     P: DeadlockPrevention,
 {
     inner: Queue<TaskRef, P>,
+}
+
+impl<P> Default for Condvar<P>
+where
+    P: DeadlockPrevention,
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<P> Condvar<P>

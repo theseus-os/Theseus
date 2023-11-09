@@ -5,16 +5,16 @@ extern crate alloc;
 use alloc::string::String;
 use keycodes_ascii::KeyEvent;
 use mouse_data::MouseEvent;
-use shapes::{Coord, Rectangle};
+use geometry::{Coordinates, Rectangle};
 
 /// An event describing mouse position rather than movement differential from last event.
 /// It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen.
 #[derive(Debug, Clone)]
 pub struct MousePositionEvent {
     /// the relative position in window
-    pub coordinate: Coord,
+    pub coordinate: Coordinates,
     /// the global position in window
-    pub gcoordinate: Coord,
+    pub gcoordinate: Coordinates,
     /// whether the mouse is scrolling up
     pub scrolling_up: bool,
     /// whether the mouse is scrolling down
@@ -32,8 +32,8 @@ pub struct MousePositionEvent {
 impl Default for MousePositionEvent {
     fn default() -> Self {
         MousePositionEvent {
-            coordinate: Coord::new(0, 0),
-            gcoordinate: Coord::new(0, 0),
+            coordinate: Coordinates::new(0, 0),
+            gcoordinate: Coordinates::new(0, 0),
             scrolling_up: false,
             scrolling_down: false,
             left_button_hold: false,

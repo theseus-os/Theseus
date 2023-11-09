@@ -3,21 +3,28 @@
 //! Equivalent to a Wayland compositor.
 
 #![no_std]
+#![feature(negative_impls)]
 
 extern crate alloc;
 
 mod window;
 
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    ops::Deref,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use async_channel::Channel;
 use futures::StreamExt;
-use graphics::{AlphaPixel, Framebuffer, GraphicsDriver, Pixel, Rectangle};
+use graphics::GraphicsDriver;
+pub use graphics::{AlphaPixel, Coordinates, Framebuffer, Pixel, Rectangle};
 use hashbrown::HashMap;
 use log::error;
 use sync_spin::Mutex;
-pub use window::Window;
+use window::LockedInner;
+
+pub use crate::window::Window;
 
 static COMPOSITOR: Option<Channel<Request>> = None;
 
@@ -39,6 +46,11 @@ where
 
     dreadnought::task::spawn_async(compositor_loop(cloned))?;
     Ok(channels)
+}
+
+pub fn screen_size() -> (usize, usize) {
+    // TODO
+    (1920, 1080)
 }
 
 #[derive(Clone)]
@@ -72,30 +84,35 @@ trait Draw {
     fn set_size(&mut self, width: usize, height: usize);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum Event {
     /// The compositor released the framebuffer.
     Release,
 }
 
-fn redraw(window: &window::Inner, dirty: Rectangle) {
+fn absolute(coordinates: Coordinates, mut rectangle: Rectangle) -> Rectangle {
+    rectangle.coordinates += coordinates;
+    rectangle
+}
+
+fn redraw<T>(window: T, dirty: Rectangle)
+where
+    T: Deref<Target = LockedInner>,
+{
     let mut locked = DRIVER.lock();
     let driver = locked.as_mut().unwrap();
     let framebuffer = driver.back();
 
+    // TODO: Take into account windows above.
     // TODO: Take into account dirty rectangle.
-
     for (i, row) in window.framebuffer.rows().enumerate() {
         let start = (window.coordinates.y + i) * framebuffer.stride();
         let end = start + row.len();
         framebuffer[start..end].clone_from_slice(row);
     }
 
-    driver.swap(&[dirty]);
-}
-
-pub trait SingleBufferGraphicsDriver {
-    fn write();
+    // TODO: Don't swap for every redraw, kinda defeats the purpose.
+    driver.swap(&[absolute(window.coordinates, dirty)]);
 }
 
 #[derive(Clone)]
@@ -120,32 +137,37 @@ impl Channels {
 
 // spin rwlock?
 // TODO: Optimisation.
-static WINDOWS: Option<sync_spin::RwLock<HashMap<usize, Arc<Mutex<window::Inner>>>>> = None;
+// TODO: Optimisation: struct of arrays: RwLock<(Vec<usize>, Vec<Coordinates>,
+// Vec<Framebuffer>, Vec<Channel>)> ordered by z-index. To get all rectangles of
+// windows above window n, just do WINDOWS.read().2[n..].clone() to minimise
+// holding the lock. Not sure about race conditions, and if we need to hold the
+// lock the entire time.
+// TODO: Should this be stored in the compositor?
+static WINDOWS: Option<sync_spin::RwLock<HashMap<usize, Arc<window::Inner>>>> = None;
 static WINDOW_ID: AtomicUsize = AtomicUsize::new(0);
 
-pub fn window() -> Window {
-    let (Window { id, inner }, clone) = Window::new(WINDOW_ID.fetch_add(1, Ordering::Relaxed));
+pub fn window(width: usize, height: usize) -> Window {
+    let (Window { id, inner }, clone) =
+        Window::new(WINDOW_ID.fetch_add(1, Ordering::Relaxed), width, height);
     WINDOWS.as_ref().unwrap().write().insert(id, inner);
     clone
 }
 
 async fn compositor_loop(mut channels: Channels) {
     loop {
-        // TODO: Compute overlap.
-
         // The select macro is not available in no_std.
         futures::select_biased!(
-            event = channels.window.next() => {
-                let event = event.unwrap();
-                handle_window_event(event);
+            request = channels.window.next() => {
+                let request = request.unwrap();
+                handle_window_request(request).await;
             }
-            event = channels.keyboard.next() => {
-                let event = event.unwrap();
-                handle_keyboard_event(event);
+            request = channels.keyboard.next() => {
+                let request = request.unwrap();
+                handle_keyboard_request(request);
             }
-            event = channels.mouse.next() => {
-                let event = event.unwrap();
-                handle_mouse_event(event);
+            request = channels.mouse.next() => {
+                let request = request.unwrap();
+                handle_mouse_request(request);
             }
             // _ = fut => panic!("compositor loop exited"),
             default => panic!("ue"),
@@ -154,17 +176,30 @@ async fn compositor_loop(mut channels: Channels) {
     }
 }
 
-fn handle_window_event(event: Request) {
-    let id = event.window_id;
+async fn handle_window_request(request: Request) {
+    let id = request.window_id;
 
     let windows = WINDOWS.as_ref().unwrap().read();
-    let window = windows.get(&id).cloned();
+    let inner = windows.get(&id).cloned();
     drop(windows);
 
-    if let Some(window) = window {
-        if let Some(inner) = window.try_lock() {
-            match event.ty {
-                RequestType::Refresh { dirty } => redraw(&inner, dirty),
+    // TODO: Take events out of inner (or at least out of Mutex).
+    let mut waker = None;
+
+    if let Some(inner) = inner {
+        if let Some(mut locked) = inner.locked.try_lock() {
+            match request.ty {
+                RequestType::Refresh { dirty } => {
+                    // This will be true once we drop the lock.
+                    locked.is_unlocked = true;
+
+                    match &locked.waker {
+                        Some(w) => waker = Some(w.clone()),
+                        None => error!("no registered waker"),
+                    }
+
+                    redraw(locked, dirty);
+                }
             }
         } else {
             error!("window was locked");
@@ -172,12 +207,16 @@ fn handle_window_event(event: Request) {
     } else {
         error!("invalid window ID");
     }
+
+    if let Some(waker) = waker {
+        waker.wake();
+    }
 }
 
-fn handle_keyboard_event(_event: event_types::Event) {
+fn handle_keyboard_request(_request: event_types::Event) {
     todo!();
 }
 
-fn handle_mouse_event(_event: event_types::Event) {
+fn handle_mouse_request(_request: event_types::Event) {
     todo!();
 }

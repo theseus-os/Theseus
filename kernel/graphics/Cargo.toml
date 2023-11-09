@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+color = { path = "../color" }
+geometry = { path = "../../libs/geometry" }
+log = "0.4.8"
 memory = { path = "../memory" }
+page_attribute_table = { path = "../page_attribute_table" }
 # TODO: Upgrade to 0.7.25
 zerocopy = "0.5.0"

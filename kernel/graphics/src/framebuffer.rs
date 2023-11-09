@@ -3,6 +3,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use geometry::{Containable, Coordinates, Rectangle};
 use memory::{BorrowedSliceMappedPages, Mutable, PhysicalAddress, PteFlags, PteFlagsArch};
 
 use crate::Pixel;
@@ -95,10 +96,8 @@ where
                 flags = flags.pat_index(
                     page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index(),
                 );
-                info!("Using PAT write-combining mapping for real physical framebuffer memory");
             } else {
                 flags = flags.device_memory(true);
-                info!("Falling back to cache-disable mapping for real physical framebuffer memory");
             }
         }
         #[cfg(not(target_arch = "x86_64"))]
@@ -122,22 +121,22 @@ where
     }
 
     #[inline]
-    pub fn dimensions(&self) -> FramebufferDimensions {
+    pub const fn dimensions(&self) -> FramebufferDimensions {
         self.dimensions
     }
 
     #[inline]
-    pub fn width(&self) -> usize {
+    pub const fn width(&self) -> usize {
         self.dimensions.width
     }
 
     #[inline]
-    pub fn height(&self) -> usize {
+    pub const fn height(&self) -> usize {
         self.dimensions.height
     }
 
     #[inline]
-    pub fn stride(&self) -> usize {
+    pub const fn stride(&self) -> usize {
         self.dimensions.stride
     }
 
@@ -150,6 +149,22 @@ where
     pub fn rows_mut(&mut self) -> impl Iterator<Item = &mut [P]> {
         let stride = self.stride();
         self.inner.chunks_mut(stride)
+    }
+
+    #[inline]
+    pub fn contains<T>(&self, containable: T) -> bool
+    where
+        T: Containable,
+    {
+        // TODO: Width or stride?
+        // TODO: Zero-width or zero-height framebuffer would panic.
+        let rectangle = Rectangle::new(Coordinates::ZERO, self.width(), self.height());
+        rectangle.contains(containable)
+    }
+
+    pub fn set(&mut self, coordinates: Coordinates, pixel: P) {
+        let stride = self.stride();
+        self[coordinates.y * stride + coordinates.x] = pixel;
     }
 }
 

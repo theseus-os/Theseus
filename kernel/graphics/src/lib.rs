@@ -1,12 +1,15 @@
 #![no_std]
+#![feature(const_trait_impl)]
 
 mod framebuffer;
 mod pixel;
-mod rectangle;
 
-pub use framebuffer::Framebuffer;
-pub use pixel::{AlphaPixel, Pixel};
-pub use rectangle::{Coordinates, Rectangle};
+pub use geometry::{Coordinates, Horizontal, Rectangle, Vertical};
+
+pub use crate::{
+    framebuffer::{Framebuffer, FramebufferDimensions},
+    pixel::{AlphaPixel, Pixel},
+};
 
 pub struct SoftwareDoubleBuffer<P>
 where
@@ -34,21 +37,58 @@ where
     }
 
     pub fn swap(&mut self, rectangles: &[Rectangle]) {
+        use geometry::{
+            Horizontal::{Left, Right},
+            Vertical::{Bottom, Top},
+        };
+
         for rectangle in rectangles {
-            for row in 0..rectangle.height {
-                let x = rectangle.coordinates.x;
-                let y = rectangle.coordinates.y + row;
+            let top = rectangle.y(Top);
+            let bottom = rectangle.y(Bottom);
 
-                // front and back have the same stride.
-                let start = y * self.front.stride() + x;
-                let end = start + rectangle.width;
+            let left = rectangle.x(Left);
+            let right = rectangle.x(Right);
 
-                // TODO: Return error.
-                assert!(self.front.width() >= x + rectangle.width);
+            if left == 0
+                && right == self.stride()
+                // TODO: Do we need this condition?
+                && self.width() == self.stride()
+            {
+                let start = top * self.stride();
+                let end = (bottom + 1) * self.stride();
 
-                self.front.inner[start..end].copy_from_slice(&self.back.inner[start..end]);
+                self.front[start..end].copy_from_slice(&self.back[start..end]);
+            }
+
+            let num_rows = bottom - top + 1;
+
+            for (front_row, back_row) in self
+                .front
+                .rows_mut()
+                .skip(top)
+                .take(num_rows)
+                .zip(self.back.rows_mut().skip(top).take(num_rows))
+            {
+                front_row[left..right].copy_from_slice(&back_row[left..right]);
             }
         }
+    }
+
+    // The front and back buffers have the same dimension.
+
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.front.width()
+    }
+
+    #[inline]
+    pub fn height(&self) -> usize {
+        self.front.height()
+    }
+
+    #[inline]
+    pub fn stride(&self) -> usize {
+        self.front.stride()
     }
 }
 

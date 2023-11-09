@@ -2,8 +2,12 @@
 name = "libterm"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
+edition = "2021"
 
 [dependencies]
+compositor = { path = "../compositor" }
+draw = { path = "../draw" }
+geometry = { path = "../../libs/geometry" }
 
 [dependencies.log]
 version = "0.4.8"
@@ -23,9 +27,6 @@ path = "../color"
 
 [dependencies.event_types]
 path = "../event_types"
-
-[dependencies.shapes]
-path = "../shapes"
 
 [dependencies.time]
 path = "../time"

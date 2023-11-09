@@ -66,7 +66,7 @@ where
         value
     }
 
-    pub async fn blocking_recv(&self) -> T {
+    pub fn blocking_recv(&self) -> T {
         dreadnought::block_on(self.recv())
     }
 }

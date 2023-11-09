@@ -16,6 +16,7 @@ use core::{
 use sync::{Mutex, MutexFlavor, MutexGuard};
 
 /// A growable, first-in first-out, multi-producer, multi-consumer, queue.
+#[derive(Debug, Default)]
 pub struct Queue<T, F>
 where
     F: MutexFlavor,
@@ -25,6 +26,7 @@ where
     len: AtomicUsize,
 }
 
+#[derive(Debug, Default)]
 struct Pointers<T> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
