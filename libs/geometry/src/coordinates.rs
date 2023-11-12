@@ -1,8 +1,8 @@
 use core::ops::{Add, AddAssign, Sub, SubAssign};
 
-use crate::Containable;
+use crate::{Containable, ConvexPolygon};
 
-#[derive(Clone, Copy, PartialEq, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Coordinates {
     pub x: usize,
     pub y: usize,
@@ -62,10 +62,12 @@ impl SubAssign<Coordinates> for Coordinates {
     }
 }
 
+unsafe impl ConvexPolygon for Coordinates {}
+
 impl Containable for Coordinates {
     type I = core::iter::Once<Coordinates>;
 
-    fn coordinates(&self) -> Self::I {
+    fn vertices(&self) -> Self::I {
         core::iter::once(*self)
     }
 }

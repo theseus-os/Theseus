@@ -22,8 +22,5 @@ path = "../interrupts"
 [dependencies.ps2]
 path = "../ps2"
 
-[dependencies.event_types]
-path = "../event_types"
-
 [lib]
 crate-type = ["rlib"]

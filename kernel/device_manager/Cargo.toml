@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 spin = "0.9.4"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
-event_types = { path = "../event_types" }
 serial_port = { path = "../serial_port" }
 console = { path = "../console" }
 logger = { path = "../logger" }

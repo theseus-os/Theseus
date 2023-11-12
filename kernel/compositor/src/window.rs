@@ -1,6 +1,5 @@
 use alloc::{boxed::Box, sync::Arc};
 use core::{
-    cell::UnsafeCell,
     future::Future,
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -9,7 +8,7 @@ use core::{
 
 use async_channel::Channel;
 use graphics::{AlphaPixel, Coordinates, Framebuffer, FramebufferDimensions, Rectangle};
-use sync_spin::{Mutex, MutexGuard};
+use sync_spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{Event, Request, RequestType, COMPOSITOR};
 
@@ -24,7 +23,8 @@ pub struct Window {
 }
 
 pub(crate) struct Inner {
-    pub(crate) locked: UnsafeCell<LockedInner>,
+    // TODO: This could be an `UnsafeCell<LockedInner>`.
+    pub(crate) locked: RwLock<LockedInner>,
     // TODO: Not spin. (unbounded?)
     pub(crate) events: Channel<Event>,
 }
@@ -49,7 +49,7 @@ unsafe impl Sync for Inner {}
 impl Window {
     pub(crate) fn new(id: usize, width: usize, height: usize) -> (Self, Self) {
         let inner = Arc::new(Inner {
-            locked: UnsafeCell::new(LockedInner {
+            locked: RwLock::new(LockedInner {
                 coordinates: Coordinates::ZERO,
                 framebuffer: Framebuffer::new_software(FramebufferDimensions {
                     width,
@@ -70,27 +70,15 @@ impl Window {
         )
     }
 
-    pub fn framebuffer(&mut self) -> impl DerefMut<Target = Framebuffer<AlphaPixel>> + '_ {
-        struct Temp<'a> {
-            inner: MutexGuard<'a, LockedInner>,
+    pub fn as_framebuffer(&self) -> impl Deref<Target = Framebuffer<AlphaPixel>> + '_ {
+        FramebufferRef {
+            inner: self.inner.locked.try_read().unwrap(),
         }
+    }
 
-        impl Deref for Temp<'_> {
-            type Target = Framebuffer<AlphaPixel>;
-
-            fn deref(&self) -> &Self::Target {
-                &self.inner.framebuffer
-            }
-        }
-
-        impl DerefMut for Temp<'_> {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.inner.framebuffer
-            }
-        }
-
-        Temp {
-            inner: self.inner.locked.try_lock().unwrap(),
+    pub fn as_mut_framebuffer(&mut self) -> impl DerefMut<Target = Framebuffer<AlphaPixel>> + '_ {
+        FramebufferMutRef {
+            inner: self.inner.locked.try_write().unwrap(),
         }
     }
 
@@ -98,23 +86,46 @@ impl Window {
         todo!();
     }
 
-    pub fn handle_event(&self) -> Result<Option<event_types::Event>, &'static str> {
-        todo!();
+    pub async fn recv(&self) -> Event {
+        self.inner.events.recv().await
     }
 
-    pub fn blocking_refresh(&mut self, dirty: Rectangle) {
-        let (waker, blocker) = waker::new_waker();
-        self.inner.locked.try_lock().unwrap().waker = Some(waker);
-        COMPOSITOR.as_ref().unwrap().blocking_send(Request {
-            window_id: self.id,
-            ty: RequestType::Refresh { dirty },
-        });
-        blocker.block();
+    pub fn try_recv(&self) -> Option<Event> {
+        self.inner.events.try_recv()
     }
+
+    pub fn blocking_recv(&self) -> Event {
+        self.inner.events.blocking_recv()
+    }
+
+    // IDEA(tsoutsman):
+    //
+    // As it currently stands, the client must wait for the compositor to release
+    // the buffer before doing anything else. This isn't too bad, as we don't have
+    // graphics-intesive applications, but it's something that could be improved on.
+    //
+    // `refresh` could be done in a two-step process, returning a future that itself
+    // returns a future. The first future would send the request, and the second
+    // future would wait for a response. Notably, the second future would still
+    // be tied to a mutable reference to self. This is both a blessing and a
+    // curse, because it correctly enforces that the window can't be used until
+    // both futures are resolved, but I'm pretty sure the borrow checker would
+    // have a fit if the second future was stored in a variable across a loop
+    // (i.e. event loop) iteration. However, this could probably be worked around
+    // with some trickery.
+    //
+    // One could imaging a double-buffering client that commits a front buffer (by
+    // awaiting the first future), and stores the second future. It then starts
+    // calculating the next frame and drawing it into the back buffer. After it's
+    // done, it polls the second future (checking if the server has released the
+    // shared buffer), and if it's ready, switches the back buffer into the shared
+    // buffer.
+    //
+    // A similar thing could be done with `blocking_refresh`.
 
     // Note that Refresh<'_> is tied to a mutable reference, and so no other mutable
     // accesses of self can occur until the future is consumed.
-    pub async fn refresh(&mut self, dirty: Rectangle) -> Refresh<'_> {
+    pub fn refresh(&mut self, dirty: Rectangle) -> Refresh<'_> {
         Refresh {
             locked: &self.inner.locked,
             id: self.id,
@@ -123,13 +134,23 @@ impl Window {
         }
     }
 
+    pub fn blocking_refresh(&mut self, dirty: Rectangle) {
+        let (waker, blocker) = waker::new_waker();
+        self.inner.locked.try_write().unwrap().waker = Some(waker);
+        COMPOSITOR.as_ref().unwrap().blocking_send(Request {
+            window_id: self.id,
+            ty: RequestType::Refresh { dirty },
+        });
+        blocker.block();
+    }
+
     pub async fn event(&self) {
         todo!();
     }
 }
 
 pub struct Refresh<'a> {
-    locked: &'a Mutex<LockedInner>,
+    locked: &'a RwLock<LockedInner>,
     id: usize,
     dirty: Rectangle,
     state: State,
@@ -154,7 +175,7 @@ impl<'a> Future for Refresh<'a> {
         // Manually implementing async functions :)
 
         if self.state == State::Init {
-            let mut locked = self.locked.try_lock().unwrap();
+            let mut locked = self.locked.try_write().unwrap();
             locked.waker = Some(cx.waker().clone());
             locked.is_unlocked = false;
             drop(locked);
@@ -181,7 +202,7 @@ impl<'a> Future for Refresh<'a> {
 
         // State::Sent
 
-        if let Some(locked) = self.locked.try_lock() {
+        if let Some(locked) = self.locked.try_read() {
             if locked.is_unlocked {
                 return Poll::Ready(());
             }
@@ -191,5 +212,35 @@ impl<'a> Future for Refresh<'a> {
         // check and returning Poll::Pending, it would have woken the waker,
         // guaranteeing that this future will be polled again.
         Poll::Pending
+    }
+}
+
+struct FramebufferRef<'a> {
+    inner: RwLockReadGuard<'a, LockedInner>,
+}
+
+impl Deref for FramebufferRef<'_> {
+    type Target = Framebuffer<AlphaPixel>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner.framebuffer
+    }
+}
+
+struct FramebufferMutRef<'a> {
+    inner: RwLockWriteGuard<'a, LockedInner>,
+}
+
+impl Deref for FramebufferMutRef<'_> {
+    type Target = Framebuffer<AlphaPixel>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner.framebuffer
+    }
+}
+
+impl DerefMut for FramebufferMutRef<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner.framebuffer
     }
 }

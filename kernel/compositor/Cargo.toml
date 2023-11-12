@@ -6,12 +6,13 @@ edition = "2021"
 [dependencies]
 async_channel = { path = "../async_channel" }
 dreadnought = { path = "../dreadnought" }
-event_types = { path = "../event_types" }
 futures = { version = "0.3.28", default-features = false, features = ["async-await"] }
 graphics = { path = "../graphics" }
 hashbrown = "0.11.2"
+keyboard = { path = "../keyboard" }
 log = "0.4.8"
 memory = { path = "../memory" }
+mouse = { path = "../mouse" }
 sync_spin = { path = "../../libs/sync_spin" }
 waker = { path = "../waker" }
 # TODO: Update to 0.7.8

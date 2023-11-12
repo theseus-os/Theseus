@@ -4,12 +4,12 @@
 #![feature(abi_x86_interrupt)]
 
 use core::sync::atomic::{AtomicBool, Ordering};
-use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
+pub use keycodes_ascii::KeyEvent;
+use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction};
 use log::{error, warn, debug};
 use once_cell::unsync::Lazy;
 use spin::Once;
 use async_channel::Channel;
-use event_types::Event;
 use ps2::{PS2Keyboard, KeyboardType, LEDState, ScancodeSet};
 use x86_64::structures::idt::InterruptStackFrame;
 
@@ -24,7 +24,7 @@ static KEYBOARD: Once<KeyboardInterruptParams> = Once::new();
 
 struct KeyboardInterruptParams {
     keyboard: PS2Keyboard<'static>,
-    queue: Channel<Event>,
+    queue: Channel<KeyEvent>,
 }
 
 /// Initialize the PS/2 keyboard driver and register its interrupt handler.
@@ -33,7 +33,7 @@ struct KeyboardInterruptParams {
 /// * `keyboard`: a wrapper around keyboard functionality, used by the keyboard interrupt handler.
 /// * `keyboard_queue_producer`: the queue onto which the keyboard interrupt handler
 ///    will push new keyboard events when a key action occurs.
-pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Channel<Event>) -> Result<(), &'static str> {
+pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Channel<KeyEvent>) -> Result<(), &'static str> {
     // Detect which kind of keyboard is connected.
     // TODO: actually do something with the keyboard type.
     match keyboard.keyboard_detect() {
@@ -114,7 +114,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
 /// 
 /// Returns Ok(()) if everything was handled properly.
 /// Otherwise, returns an error string.
-fn handle_keyboard_input(keyboard: &PS2Keyboard, queue: &Channel<Event>, scan_code: u8, extended: bool) -> Result<(), &'static str> {
+fn handle_keyboard_input(keyboard: &PS2Keyboard, queue: &Channel<KeyEvent>, scan_code: u8, extended: bool) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
     // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
@@ -194,7 +194,7 @@ fn handle_keyboard_input(keyboard: &PS2Keyboard, queue: &Channel<Event>, scan_co
     };
 
     if let Ok(keycode) = Keycode::try_from(adjusted_scan_code) {
-        let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, **modifiers));
+        let event = KeyEvent::new(keycode, action, **modifiers);
         queue.try_send(event).map_err(|_| "keyboard input queue is full")
     } else {
         error!("handle_keyboard_input(): Unknown scancode: {scan_code:?}, adjusted scancode: {adjusted_scan_code:?}");

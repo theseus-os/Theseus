@@ -32,7 +32,6 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate bitflags;
-extern crate event_types;
 extern crate unicode_width;
 extern crate core2;
 extern crate vte;

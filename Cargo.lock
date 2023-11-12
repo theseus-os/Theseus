@@ -548,12 +548,13 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "dreadnought",
- "event_types",
  "futures",
  "graphics",
  "hashbrown",
+ "keyboard",
  "log",
  "memory",
+ "mouse",
  "sync_spin",
  "waker",
  "zerocopy",
@@ -955,7 +956,6 @@ dependencies = [
  "core2",
  "derive_more",
  "e1000",
- "event_types",
  "fatfs",
  "io",
  "iommu",
@@ -1097,15 +1097,6 @@ dependencies = [
  "hashbrown",
  "path",
  "root",
-]
-
-[[package]]
-name = "event_types"
-version = "0.1.0"
-dependencies = [
- "geometry",
- "keycodes_ascii",
- "mouse_data",
 ]
 
 [[package]]
@@ -1740,7 +1731,6 @@ name = "keyboard"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "event_types",
  "interrupts",
  "keycodes_ascii",
  "log",
@@ -1815,7 +1805,6 @@ dependencies = [
  "dfqueue",
  "draw",
  "environment",
- "event_types",
  "font",
  "geometry",
  "log",
@@ -2223,7 +2212,6 @@ name = "mouse"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "event_types",
  "interrupts",
  "log",
  "mouse_data",
@@ -3334,7 +3322,6 @@ dependencies = [
  "core2",
  "dfqueue",
  "environment",
- "event_types",
  "fs_node",
  "keycodes_ascii",
  "lazy_static",
@@ -3975,7 +3962,6 @@ dependencies = [
  "bitflags",
  "core2",
  "derive_more",
- "event_types",
  "log",
  "unicode-width",
  "vte",

@@ -9,7 +9,6 @@ use log::{info, debug};
 use {
     log::{error, warn},
     async_channel::Channel,
-    event_types::Event,
     memory::MemoryManagementInfo,
     alloc::vec::Vec,
     io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter},
@@ -48,9 +47,9 @@ pub fn early_init(
 /// * All other devices discovered on the [`pci`] bus.
 pub fn init(
     #[cfg(target_arch = "x86_64")]
-    key_producer: Channel<Event>,
+    key_producer: Channel<keyboard::KeyEvent>,
     #[cfg(target_arch = "x86_64")]
-    mouse_producer: Channel<Event>,
+    mouse_producer: Channel<mouse::MouseEvent>,
 ) -> Result<(), &'static str>  {
 
     let serial_ports = logger::take_early_log_writers();

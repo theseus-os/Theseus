@@ -11,7 +11,7 @@ impl Circle {
     where
         T: Containable,
     {
-        for coordinates in containable.coordinates() {
+        for coordinates in containable.vertices() {
             let diff = self.center.abs_diff(coordinates);
             if diff.x.pow(2) + diff.y.pow(2) > self.radius.pow(2) {
                 return false;

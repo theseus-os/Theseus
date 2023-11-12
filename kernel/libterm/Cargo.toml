@@ -25,9 +25,6 @@ path = "../root"
 [dependencies.color]
 path = "../color"
 
-[dependencies.event_types]
-path = "../event_types"
-
 [dependencies.time]
 path = "../time"
 

@@ -1,7 +1,5 @@
 // TODO: Move `font` crate to libs
 
-use core::fmt::Display;
-
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use geometry::Coordinates;
 use graphics::{Framebuffer, Pixel};

@@ -20,8 +20,16 @@ pub enum Horizontal {
     Right,
 }
 
-pub trait Containable {
+/// A shape that can be contained by another shape.
+///
+/// Since the shape must be a convex polygon, it is enough to check that all the
+/// vertices of the shape are contained.
+pub trait Containable: ConvexPolygon {
     type I: Iterator<Item = Coordinates>;
 
-    fn coordinates(&self) -> Self::I;
+    /// The vertices of the shape.
+    fn vertices(&self) -> Self::I;
 }
+
+/// A convex polygon.
+pub unsafe trait ConvexPolygon {}

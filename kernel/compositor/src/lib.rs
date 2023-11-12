@@ -12,7 +12,7 @@ mod window;
 use alloc::sync::Arc;
 use core::{
     ops::Deref,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 use async_channel::Channel;
@@ -20,32 +20,33 @@ use futures::StreamExt;
 use graphics::GraphicsDriver;
 pub use graphics::{AlphaPixel, Coordinates, Framebuffer, Pixel, Rectangle};
 use hashbrown::HashMap;
+use keyboard::KeyEvent;
 use log::error;
-use sync_spin::Mutex;
+use mouse::MouseEvent;
 use window::LockedInner;
 
 pub use crate::window::Window;
 
 static COMPOSITOR: Option<Channel<Request>> = None;
 
-static DRIVER: Mutex<Option<GraphicsDriver<AlphaPixel>>> = Mutex::new(None);
+static IS_INITIALISED: AtomicBool = AtomicBool::new(false);
 
 pub fn init<T>(driver: T) -> Result<Channels, &'static str>
 where
     T: Into<GraphicsDriver<AlphaPixel>>,
 {
-    let mut maybe_driver = DRIVER.lock();
-    assert!(
-        maybe_driver.is_none(),
-        "initialised compositor multiple times"
-    );
-    *maybe_driver = Some(driver.into());
-
-    let channels = Channels::new();
-    let cloned = channels.clone();
-
-    dreadnought::task::spawn_async(compositor_loop(cloned))?;
-    Ok(channels)
+    // TODO: Orderings??
+    if IS_INITIALISED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .unwrap_or(false)
+    {
+        let channels = Channels::new();
+        let cloned = channels.clone();
+        dreadnought::task::spawn_async(compositor_loop(driver.into(), cloned))?;
+        Ok(channels)
+    } else {
+        panic!("initialised compositor multiple times");
+    }
 }
 
 pub fn screen_size() -> (usize, usize) {
@@ -69,25 +70,11 @@ enum RequestType {
     Refresh { dirty: Rectangle },
 }
 
-trait Draw {
-    fn display<P>(
-        &mut self,
-        // coordinate: Coord,
-        framebuffer: &mut Framebuffer<P>,
-        // ) -> Result<Rectangle, &'static str>
-    ) -> Result<(), &'static str>
-    where
-        P: Pixel;
-
-    fn size(&self) -> (usize, usize);
-
-    fn set_size(&mut self, width: usize, height: usize);
-}
-
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Event {
-    /// The compositor released the framebuffer.
-    Release,
+    Keyboard(KeyEvent),
+    Mouse(MouseEvent),
+    Resize(Rectangle),
 }
 
 fn absolute(coordinates: Coordinates, mut rectangle: Rectangle) -> Rectangle {
@@ -95,12 +82,10 @@ fn absolute(coordinates: Coordinates, mut rectangle: Rectangle) -> Rectangle {
     rectangle
 }
 
-fn redraw<T>(window: T, dirty: Rectangle)
+fn refresh<T>(driver: &mut GraphicsDriver<AlphaPixel>, window: T, dirty: Rectangle)
 where
     T: Deref<Target = LockedInner>,
 {
-    let mut locked = DRIVER.lock();
-    let driver = locked.as_mut().unwrap();
     let framebuffer = driver.back();
 
     // TODO: Take into account windows above.
@@ -111,7 +96,8 @@ where
         framebuffer[start..end].clone_from_slice(row);
     }
 
-    // TODO: Don't swap for every redraw, kinda defeats the purpose.
+    // TODO: This should be called in an interrupt handler or smthing like that to
+    // prevent screen tearing.
     driver.swap(&[absolute(window.coordinates, dirty)]);
 }
 
@@ -120,9 +106,9 @@ pub struct Channels {
     // FIXME: Event type
     window: Channel<Request>,
     // FIXME: Deadlock prevention.
-    keyboard: Channel<event_types::Event>,
+    keyboard: Channel<keyboard::KeyEvent>,
     // FIXME: Deadlock prevention.
-    mouse: Channel<event_types::Event>,
+    mouse: Channel<mouse::MouseEvent>,
 }
 
 impl Channels {
@@ -153,13 +139,13 @@ pub fn window(width: usize, height: usize) -> Window {
     clone
 }
 
-async fn compositor_loop(mut channels: Channels) {
+async fn compositor_loop(mut driver: GraphicsDriver<AlphaPixel>, mut channels: Channels) {
     loop {
         // The select macro is not available in no_std.
         futures::select_biased!(
             request = channels.window.next() => {
                 let request = request.unwrap();
-                handle_window_request(request).await;
+                handle_window_request(&mut driver, request).await;
             }
             request = channels.keyboard.next() => {
                 let request = request.unwrap();
@@ -169,14 +155,12 @@ async fn compositor_loop(mut channels: Channels) {
                 let request = request.unwrap();
                 handle_mouse_request(request);
             }
-            // _ = fut => panic!("compositor loop exited"),
-            default => panic!("ue"),
             complete => panic!("compositor loop exited"),
         );
     }
 }
 
-async fn handle_window_request(request: Request) {
+async fn handle_window_request(driver: &mut GraphicsDriver<AlphaPixel>, request: Request) {
     let id = request.window_id;
 
     let windows = WINDOWS.as_ref().unwrap().read();
@@ -187,7 +171,7 @@ async fn handle_window_request(request: Request) {
     let mut waker = None;
 
     if let Some(inner) = inner {
-        if let Some(mut locked) = inner.locked.try_lock() {
+        if let Some(mut locked) = inner.locked.try_write() {
             match request.ty {
                 RequestType::Refresh { dirty } => {
                     // This will be true once we drop the lock.
@@ -198,7 +182,7 @@ async fn handle_window_request(request: Request) {
                         None => error!("no registered waker"),
                     }
 
-                    redraw(locked, dirty);
+                    refresh(driver, locked, dirty);
                 }
             }
         } else {
@@ -213,10 +197,10 @@ async fn handle_window_request(request: Request) {
     }
 }
 
-fn handle_keyboard_request(_request: event_types::Event) {
+fn handle_keyboard_request(_request: keyboard::KeyEvent) {
     todo!();
 }
 
-fn handle_mouse_request(_request: event_types::Event) {
+fn handle_mouse_request(_request: mouse::MouseEvent) {
     todo!();
 }

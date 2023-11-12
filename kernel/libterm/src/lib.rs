@@ -19,10 +19,9 @@ use alloc::{
 };
 
 use color::Color;
-use compositor::{Framebuffer, Pixel, Window, AlphaPixel};
+use compositor::{Event, Framebuffer, Pixel, Window};
 use draw::{Drawable, Coordinates, Settings, Text, Rectangle};
 use geometry::{Horizontal, Vertical};
-use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use log::error;
 use time::Duration;
@@ -61,8 +60,8 @@ impl Terminal {
     pub fn get_text_dimensions(&self) -> (usize, usize) {
         (
             // The type parameter doesn't matter.
-            Text::<&str>::grid_width(&self.window.framebuffer()),
-            Text::<&str>::grid_height(&self.window.framebuffer()),
+            Text::<&str>::grid_width(&self.window.as_framebuffer()),
+            Text::<&str>::grid_height(&self.window.as_framebuffer()),
         )
     }
 
@@ -370,25 +369,12 @@ impl Terminal {
                 new_end_idx
             },
         };
-        let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
+        let result = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.display_text(slice)?;
+            display_text(&mut self.window, slice);
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
-        Ok(())
-    }
-
-    /// Display the text displayable in the window and render it to the screen
-    fn display_text(&mut self, text: &str) -> Result<(), &'static str>{
-        let settings = Settings {
-            foreground: FONT_FOREGROUND_COLOR.into(),
-            background: Some(FONT_BACKGROUND_COLOR.into()),
-        };
-        let area_to_render = Text::new(Coordinates::ZERO, text)
-            .draw(&mut *self.window.framebuffer(), &settings);
-        // TODO
-        self.window.blocking_refresh(Rectangle::MAX);
         Ok(())
     }
 
@@ -400,7 +386,7 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            self.display_text(slice)?;
+            display_text(&mut self.window, slice);
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -573,20 +559,15 @@ impl Terminal {
     /// Gets an event from the window's event queue.
     /// 
     /// Returns `None` if no events have been sent to this window.
-    pub fn get_event(&mut self) -> Option<Event> {
-        match self.window.handle_event() {
-            Ok(event) => event,
-            Err(_e) => {
-                error!("Terminal::get_event(): error in the window's event handler: {:?}.", _e);
-                Some(Event::ExitEvent)
-            }
-        }
+    // TODO: This function shouldn't exist. It should either block, or return a future.
+    pub fn get_event(&mut self) -> Event {
+        self.window.blocking_recv()
     }
 
     /// Display the cursor of the terminal.
     pub fn display_cursor(&mut self) -> Result<(), &'static str> {
         // get info about the text displayable
-        let (next_col, next_row) = Text::<&str>::next_grid_position(todo!(), &*self.window.framebuffer());
+        let (next_col, next_row) = Text::<&str>::next_grid_position(todo!(), &*self.window.as_framebuffer());
         let (num_col, num_row) = self.get_text_dimensions();
 
         // return if the cursor is not in the screen
@@ -601,7 +582,7 @@ impl Terminal {
                 coord,
                 next_col,
                 next_row,
-                &mut *self.window.framebuffer(),
+                &mut *self.window.as_mut_framebuffer(),
             )?
         };   
 
@@ -629,4 +610,14 @@ impl Terminal {
         self.refresh_display()?;
         Ok(())
     }
+}
+
+fn display_text(window: &mut Window, text: &str) {
+    let settings = Settings {
+        foreground: FONT_FOREGROUND_COLOR.into(),
+        background: Some(FONT_BACKGROUND_COLOR.into()),
+    };
+    Text::new(Coordinates::ZERO, text).draw(&mut *window.as_mut_framebuffer(), &settings);
+    // TODO
+    window.blocking_refresh(Rectangle::MAX);
 }

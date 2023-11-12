@@ -24,7 +24,6 @@
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
 //! * `compositor`: The trait of a compositor. It composites a list of buffers to a final buffer.
-//! * `event_types`: The types used for passing input and output events across the system.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `displayable`: Defines a displayable trait. A displayable can display itself in a framebuffer.
 //! * `text_display`: A text display is a displayable. It contains a block of text and can display in a framebuffer.
