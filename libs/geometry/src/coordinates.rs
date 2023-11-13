@@ -9,7 +9,7 @@ pub struct Coordinates {
 }
 
 impl Coordinates {
-    pub const ZERO: Self = Self { x: 0, y: 0 };
+    pub const ORIGIN: Self = Self { x: 0, y: 0 };
 
     pub const MAX: Self = Self {
         x: usize::MAX,

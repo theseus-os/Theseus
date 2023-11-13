@@ -14,16 +14,17 @@ extern crate alloc;
 pub mod cursor;
 
 use alloc::{
+    borrow::ToOwned,
     string::{String, ToString},
     vec::Vec,
 };
 
 use color::Color;
-use compositor::{Event, Framebuffer, Pixel, Window};
+use compositor::{Framebuffer, Pixel, Window};
+pub use compositor::Event;
 use draw::{Drawable, Coordinates, Settings, Text, Rectangle};
 use geometry::{Horizontal, Vertical};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use log::error;
 use time::Duration;
 
 use crate::cursor::*;
@@ -52,6 +53,8 @@ pub struct Terminal {
     scroll_start_idx: usize,
     /// The cursor of the terminal.
     pub cursor: Cursor,
+    // TODO: Document
+    pub text: String,
 }
 
 /// Private methods of `Terminal`.
@@ -371,6 +374,8 @@ impl Terminal {
         };
         let result = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
+            // TODO: Avoid allocating?
+            self.text = slice.to_owned();
             display_text(&mut self.window, slice);
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -386,6 +391,8 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
+            // TODO: Avoid allocating?
+            self.text = slice.to_owned();
             display_text(&mut self.window, slice);
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -405,14 +412,13 @@ impl Terminal {
             window_height,
         );
         
-        let area = window.area();
-
         let mut terminal = Terminal {
             window,
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
             cursor: Cursor::default(),
+            text: String::new(),
         };
         // TODO: Fill background.
 
@@ -560,14 +566,15 @@ impl Terminal {
     /// 
     /// Returns `None` if no events have been sent to this window.
     // TODO: This function shouldn't exist. It should either block, or return a future.
-    pub fn get_event(&mut self) -> Event {
-        self.window.blocking_recv()
+    pub fn get_event(&mut self) -> Option<Event> {
+        self.window.try_recv()
     }
 
     /// Display the cursor of the terminal.
     pub fn display_cursor(&mut self) -> Result<(), &'static str> {
         // get info about the text displayable
-        let (next_col, next_row) = Text::<&str>::next_grid_position(todo!(), &*self.window.as_framebuffer());
+        let (next_col, next_row) =
+            Text::new(Coordinates::ORIGIN, &self.text).next_grid_position(&*self.window.as_framebuffer());
         let (num_col, num_row) = self.get_text_dimensions();
 
         // return if the cursor is not in the screen
@@ -617,7 +624,7 @@ fn display_text(window: &mut Window, text: &str) {
         foreground: FONT_FOREGROUND_COLOR.into(),
         background: Some(FONT_BACKGROUND_COLOR.into()),
     };
-    Text::new(Coordinates::ZERO, text).draw(&mut *window.as_mut_framebuffer(), &settings);
+    Text::new(Coordinates::ORIGIN, text).draw(&mut *window.as_mut_framebuffer(), &settings);
     // TODO
     window.blocking_refresh(Rectangle::MAX);
 }

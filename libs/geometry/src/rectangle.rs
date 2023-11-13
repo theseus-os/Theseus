@@ -10,7 +10,7 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
-    pub const MAX: Self = Self::new(Coordinates::ZERO, usize::MAX, usize::MAX);
+    pub const MAX: Self = Self::new(Coordinates::ORIGIN, usize::MAX, usize::MAX);
 
     /// Returns a rectangle with the top left vertex at `coordinates`.
     ///

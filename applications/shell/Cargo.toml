@@ -15,10 +15,6 @@ version = "0.4.8"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
-
 [dependencies.spawn]
 path = "../../kernel/spawn"
 

@@ -29,6 +29,7 @@ pub(crate) struct Inner {
     pub(crate) events: Channel<Event>,
 }
 
+#[derive(Debug)]
 pub(crate) struct LockedInner {
     pub(crate) coordinates: Coordinates,
     // pub border_size: usize,
@@ -50,7 +51,7 @@ impl Window {
     pub(crate) fn new(id: usize, width: usize, height: usize) -> (Self, Self) {
         let inner = Arc::new(Inner {
             locked: RwLock::new(LockedInner {
-                coordinates: Coordinates::ZERO,
+                coordinates: Coordinates::ORIGIN,
                 framebuffer: Framebuffer::new_software(FramebufferDimensions {
                     width,
                     height,
@@ -83,7 +84,7 @@ impl Window {
     }
 
     pub fn area(&self) -> Rectangle {
-        todo!();
+        Rectangle::new(Coordinates::ORIGIN, 0x500, 0x400)
     }
 
     pub async fn recv(&self) -> Event {
@@ -137,7 +138,7 @@ impl Window {
     pub fn blocking_refresh(&mut self, dirty: Rectangle) {
         let (waker, blocker) = waker::new_waker();
         self.inner.locked.try_write().unwrap().waker = Some(waker);
-        COMPOSITOR.as_ref().unwrap().blocking_send(Request {
+        COMPOSITOR.get().unwrap().blocking_send(Request {
             window_id: self.id,
             ty: RequestType::Refresh { dirty },
         });
@@ -180,7 +181,7 @@ impl<'a> Future for Refresh<'a> {
             locked.is_unlocked = false;
             drop(locked);
 
-            let mut future = Box::pin(COMPOSITOR.as_ref().unwrap().send(Request {
+            let mut future = Box::pin(COMPOSITOR.get().unwrap().send(Request {
                 window_id: self.id,
                 ty: RequestType::Refresh { dirty: self.dirty },
             }));

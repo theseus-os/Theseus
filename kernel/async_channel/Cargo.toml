@@ -10,3 +10,4 @@ futures = { version = "0.3.28", default-features = false }
 mpmc = "0.1.6"
 sync = { path = "../../libs/sync" }
 sync_spin = { path = "../../libs/sync_spin" }
+log = "0.4.8"

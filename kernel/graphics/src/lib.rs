@@ -4,6 +4,7 @@
 mod framebuffer;
 mod pixel;
 
+use core::cmp::min;
 pub use geometry::{Coordinates, Horizontal, Rectangle, Vertical};
 
 pub use crate::{
@@ -44,13 +45,14 @@ where
 
         for rectangle in rectangles {
             let top = rectangle.y(Top);
-            let bottom = rectangle.y(Bottom);
+            let bottom = min(rectangle.y(Bottom), self.height() - 1);
 
             let left = rectangle.x(Left);
-            let right = rectangle.x(Right);
+            // TODO: Width or stride?
+            let right = min(rectangle.x(Right), self.width() - 1);
 
             if left == 0
-                && right == self.stride()
+                && right == self.stride() - 1
                 // TODO: Do we need this condition?
                 && self.width() == self.stride()
             {

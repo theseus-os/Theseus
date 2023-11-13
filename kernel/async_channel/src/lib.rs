@@ -77,6 +77,7 @@ where
         self.senders
             .wait_until(|| match self.inner.push(temp.take().unwrap()) {
                 Ok(()) => {
+                    log::info!("succesfully sent message");
                     self.receivers.notify_one();
                     Some(())
                 }
@@ -94,7 +95,9 @@ where
     ///
     /// Returns an error containing `value` if the channel was full.
     pub fn try_send(&self, value: T) -> Result<(), T> {
-        self.inner.push(value)
+        self.inner.push(value)?;
+        self.receivers.notify_one();
+        Ok(())
     }
 
     /// Blocks the current thread until `value` is sent.
@@ -115,7 +118,9 @@ where
 
     /// Tries to receive the next value.
     pub fn try_recv(&self) -> Option<T> {
-        self.inner.pop()
+        let value = self.inner.pop()?;
+        self.senders.notify_one();
+        Some(value)
     }
 
     /// Blocks the current thread until a value is received.

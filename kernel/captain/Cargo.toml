@@ -20,6 +20,7 @@ kernel_config = { path = "../kernel_config" }
 compositor = { path = "../compositor" }
 interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
+graphics = { path = "../graphics" }
 mod_mgmt = { path = "../mod_mgmt" }
 no_drop = { path = "../no_drop" }
 console = { path = "../console" }

@@ -2,6 +2,7 @@ use core::{
     borrow::{Borrow, BorrowMut},
     ops::{Deref, DerefMut},
 };
+use core::fmt::{Debug, Formatter};
 
 use geometry::{Containable, Coordinates, Rectangle};
 use memory::{BorrowedSliceMappedPages, Mutable, PhysicalAddress, PteFlags, PteFlagsArch};
@@ -16,11 +17,22 @@ where
     dimensions: FramebufferDimensions,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct FramebufferDimensions {
     pub width: usize,
     pub height: usize,
     pub stride: usize,
+}
+
+impl<P> Debug for Framebuffer<P>
+where
+    P: Pixel
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Framebuffer")
+            .field("dimensions", &self.dimensions)
+            .finish()
+    }
 }
 
 impl<P> Framebuffer<P>
@@ -73,7 +85,7 @@ where
     }
 
     #[inline]
-    pub fn new_hardware(address: PhysicalAddress, dimensions: FramebufferDimensions) -> Self {
+    pub unsafe fn new_hardware(address: PhysicalAddress, dimensions: FramebufferDimensions) -> Self {
         assert!(
             dimensions.width <= dimensions.stride,
             "invalid framebuffer dimensions"
@@ -158,7 +170,7 @@ where
     {
         // TODO: Width or stride?
         // TODO: Zero-width or zero-height framebuffer would panic.
-        let rectangle = Rectangle::new(Coordinates::ZERO, self.width(), self.height());
+        let rectangle = Rectangle::new(Coordinates::ORIGIN, self.width(), self.height());
         rectangle.contains(containable)
     }
 

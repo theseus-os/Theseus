@@ -13,6 +13,7 @@ keyboard = { path = "../keyboard" }
 log = "0.4.8"
 memory = { path = "../memory" }
 mouse = { path = "../mouse" }
+spin = "0.9.4"
 sync_spin = { path = "../../libs/sync_spin" }
 waker = { path = "../waker" }
 # TODO: Update to 0.7.8

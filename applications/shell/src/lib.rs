@@ -7,11 +7,8 @@
 #![no_std]
 extern crate keycodes_ascii;
 extern crate spin;
-extern crate dfqueue;
 extern crate spawn;
 extern crate task;
-extern crate event_types; 
-extern crate window_manager;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -25,14 +22,12 @@ extern crate libterm;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-use event_types::Event;
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use path::Path;
 use task::{ExitValue, KillReason, JoinableTaskRef};
-use libterm::Terminal;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use libterm::{Event, Terminal};
 use alloc::sync::Arc;
 use spin::Mutex;
 use environment::Environment;
@@ -158,11 +153,6 @@ struct Shell {
     /// When someone enters some commands, but before pressing `enter` it presses `up` to see previous commands,
     /// we must push it to command_history. We don't want to push it twice.
     buffered_cmd_recorded: bool,
-    /// The consumer to the terminal's print dfqueue
-    print_consumer: DFQueueConsumer<Event>,
-    /// The producer to the terminal's print dfqueue
-    #[allow(dead_code)]
-    print_producer: DFQueueProducer<Event>,
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
@@ -173,13 +163,6 @@ impl Shell {
     /// Create a new shell. Currently the shell will bind to the default terminal instance provided
     /// by the `app_io` crate.
     fn new() -> Result<Shell, &'static str> {
-        // Initialize a dfqueue for the terminal object to handle printing from applications.
-        // Note that this is only to support legacy output. Newly developed applications should
-        // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
-        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
-        let print_consumer = terminal_print_dfq.into_consumer();
-        let print_producer = print_consumer.obtain_producer();
-
         let key_event_queue: KeyEventQueue = KeyEventQueue::new();
         let key_event_producer = key_event_queue.get_writer();
         let key_event_consumer = key_event_queue.get_reader();
@@ -199,8 +182,6 @@ impl Shell {
             command_history: Vec::new(),
             history_index: 0,
             buffered_cmd_recorded: false,
-            print_consumer,
-            print_producer,
             env: Arc::new(Mutex::new(env)),
             terminal
         })
@@ -1172,16 +1153,6 @@ impl Shell {
     fn check_and_print_app_output(&mut self) -> bool {
         let mut need_refresh = false;
 
-        // Support for legacy output by `terminal_print`.
-        if let Some(print_event) = self.print_consumer.peek() {
-            if let Event::OutputEvent(ref s) = print_event.deref() {
-                self.terminal.lock().print_to_terminal(s.clone());
-            }
-            print_event.mark_completed();
-            // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
-            need_refresh =  true;
-        }
-
         let mut buf: [u8; 256] = [0; 256];
 
         // iterate through all jobs to see if they have something to print
@@ -1270,22 +1241,15 @@ impl Shell {
                 locked_terminal.get_event()
             } {
                 match ev {
-                    // Returns from the main loop.
-                    Event::ExitEvent => {
-                        trace!("exited terminal");
-                        return Ok(());
-                    }
-
-                    Event::WindowResizeEvent(new_position) => {
+                    Event::Resize(new_position) => {
                         self.terminal.lock().resize(new_position)?;
                         // the above function also refreshes the terminal display
                     }
 
                     // Handles ordinary keypresses
-                    Event::KeyboardEvent(ref input_event) => {
-                        self.key_event_producer.write_one(input_event.key_event);
+                    Event::Keyboard(input_event) => {
+                        self.key_event_producer.write_one(input_event);
                     }
-
                     _unhandled => { 
                         // trace!("Shell is ignoring unhandled event: {:?}", _unhandled);
                     }
@@ -1294,15 +1258,6 @@ impl Shell {
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
-            }
-
-            let is_active = {
-                let term = self.terminal.lock();
-                term.window.is_active()
-            };
-            
-            if is_active {
-                self.terminal.lock().display_cursor()?;
             }
 
             // handle inputs
