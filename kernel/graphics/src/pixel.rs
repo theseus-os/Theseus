@@ -7,10 +7,10 @@ pub trait Pixel: FromBytes + Copy {}
 // This is necessary right?
 #[repr(C)]
 pub struct AlphaPixel {
-    alpha: u8,
-    red: u8,
-    green: u8,
     blue: u8,
+    green: u8,
+    red: u8,
+    alpha: u8,
 }
 
 impl Pixel for AlphaPixel {}

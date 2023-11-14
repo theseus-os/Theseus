@@ -175,7 +175,6 @@ dependencies = [
  "async_wait_queue",
  "dreadnought",
  "futures",
- "log",
  "mpmc",
  "sync",
  "sync_spin",
@@ -1015,6 +1014,7 @@ dependencies = [
  "font",
  "geometry",
  "graphics",
+ "log",
 ]
 
 [[package]]

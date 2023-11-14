@@ -1,12 +1,14 @@
 #![no_std]
 
 mod text;
+mod character;
 
 pub use geometry::{Circle, Coordinates, Line, Rectangle};
 use geometry::{Horizontal, Vertical};
 use graphics::{Framebuffer, Pixel};
 
 pub use crate::text::Text;
+pub use crate::character::Char;
 
 pub struct Settings<P>
 where

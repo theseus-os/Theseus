@@ -77,7 +77,6 @@ where
         self.senders
             .wait_until(|| match self.inner.push(temp.take().unwrap()) {
                 Ok(()) => {
-                    log::info!("succesfully sent message");
                     self.receivers.notify_one();
                     Some(())
                 }

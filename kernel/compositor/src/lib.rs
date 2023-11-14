@@ -1,6 +1,8 @@
-//! Stuff.
+//! This crate is responsible for composing window buffers, handling window
+//! interactions (e.g. dragging, resizing), and sending input to the correct
+//! window.
 //!
-//! Equivalent to a Wayland compositor.
+//! It is roughly equivalent in scope to a compositing window manager on Linux.
 
 #![no_std]
 #![feature(negative_impls)]
@@ -12,7 +14,7 @@ mod window;
 use alloc::sync::Arc;
 use core::{
     ops::Deref,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use async_channel::Channel;
@@ -27,35 +29,28 @@ use spin::Once;
 use sync_spin::RwLock;
 use window::LockedInner;
 
+use crate::window::Inner;
 pub use crate::window::Window;
 
 static COMPOSITOR: Once<Channel<Request>> = Once::new();
-
-static IS_INITIALISED: AtomicBool = AtomicBool::new(false);
 
 pub fn init<T>(driver: T) -> Result<Channels, &'static str>
 where
     T: Into<GraphicsDriver<AlphaPixel>>,
 {
-    // TODO: Orderings??
-    if IS_INITIALISED
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_ok()
-    {
-        let channels = Channels::new();
-        let cloned = channels.clone();
-
-        let mut windows = WINDOWS.write();
-        assert!(windows.is_none());
-        *windows = Some(HashMap::new());
-        // TODO
-        COMPOSITOR.call_once(|| channels.window.clone());
-
-        dreadnought::task::spawn_async(compositor_loop(driver.into(), cloned))?;
-        Ok(channels)
-    } else {
-        panic!("initialised compositor multiple times");
+    let mut windows = WINDOWS.write();
+    if windows.is_some() {
+        return Err("initialised compositor multiple times");
     }
+    *windows = Some(HashMap::new());
+
+    let channels = Channels::new();
+    let cloned = channels.clone();
+    // TODO: Remove clone.
+    COMPOSITOR.call_once(|| channels.window.clone());
+
+    dreadnought::task::spawn_async(compositor_loop(driver.into(), cloned))?;
+    Ok(channels)
 }
 
 pub fn screen_size() -> (usize, usize) {
@@ -97,11 +92,6 @@ where
 {
     let framebuffer = driver.back();
 
-    log::info!("refreshing rectangle: {dirty:0x?}");
-
-    log::info!("window: {window:0x?}");
-    log::info!("framebuffer: {framebuffer:0x?}");
-
     // TODO: Take into account windows above.
     // TODO: Take into account dirty rectangle.
     for (i, row) in window.framebuffer.rows().enumerate() {
@@ -110,8 +100,8 @@ where
         framebuffer[start..end].clone_from_slice(row);
     }
 
-    // TODO: This should be called in an interrupt handler or smthing like that to
-    // prevent screen tearing.
+    // TODO: This should be called in an interrupt handler or something like that to
+    //  prevent screen tearing.
     driver.swap(&[absolute(window.coordinates, dirty)]);
 }
 
@@ -120,9 +110,9 @@ pub struct Channels {
     // FIXME: Deadlock prevention.
     pub window: Channel<Request>,
     // FIXME: Deadlock prevention.
-    pub keyboard: Channel<keyboard::KeyEvent>,
+    pub keyboard: Channel<KeyEvent>,
     // FIXME: Deadlock prevention.
-    pub mouse: Channel<mouse::MouseEvent>,
+    pub mouse: Channel<MouseEvent>,
 }
 
 impl Channels {
@@ -136,14 +126,12 @@ impl Channels {
 }
 
 // spin rwlock?
-// TODO: Optimisation.
-// TODO: Optimisation: struct of arrays: RwLock<(Vec<usize>, Vec<Coordinates>,
-// Vec<Framebuffer>, Vec<Channel>)> ordered by z-index. To get all rectangles of
-// windows above window n, just do WINDOWS.read().2[n..].clone() to minimise
-// holding the lock. Not sure about race conditions, and if we need to hold the
-// lock the entire time.
-// TODO: Should this be stored in the compositor?
-static WINDOWS: RwLock<Option<HashMap<usize, Arc<window::Inner>>>> = RwLock::new(None);
+// IDEA(tsoutsman): Optimisation: struct of arrays: RwLock<(Vec<usize>,
+// Vec<Coordinates>), Vec<Framebuffer>, Vec<Channel>)> ordered by z-index. To
+// get all rectangles of windows above window n, just do
+// WINDOWS.read().2[n..].clone() to minimise holding the lock. Not sure about
+// race conditions, and if we need to hold the lock the entire time.
+static WINDOWS: RwLock<Option<HashMap<usize, Arc<Inner>>>> = RwLock::new(None);
 static WINDOW_ID: AtomicUsize = AtomicUsize::new(0);
 
 pub fn window(width: usize, height: usize) -> Window {
@@ -155,7 +143,7 @@ pub fn window(width: usize, height: usize) -> Window {
 
 async fn compositor_loop(mut driver: GraphicsDriver<AlphaPixel>, mut channels: Channels) {
     loop {
-        log::info!("compositor looping");
+        // log::info!("compositor looping");
         // The select macro is not available in no_std.
         futures::select_biased!(
             request = channels.window.next() => {
@@ -172,7 +160,7 @@ async fn compositor_loop(mut driver: GraphicsDriver<AlphaPixel>, mut channels: C
             }
             complete => panic!("compositor loop exited"),
         );
-        log::info!("compositor looped");
+        // log::info!("compositor looped");
     }
 }
 
@@ -213,14 +201,27 @@ async fn handle_window_request(driver: &mut GraphicsDriver<AlphaPixel>, request:
     }
 }
 
-fn handle_keyboard_request(event: keyboard::KeyEvent) {
-    let window = WINDOWS.read().as_ref().unwrap().get(&0).cloned().unwrap();
-
-    if window.events.try_send(Event::Keyboard(event)).is_err() {
-        log::info!("dropping keyboard event");
+fn handle_keyboard_request(event: KeyEvent) {
+    if let Some(active_window) = active_window() {
+        if active_window
+            .events
+            .try_send(Event::Keyboard(event))
+            .is_err()
+        {
+            log::info!("dropping keyboard event");
+        }
     }
 }
 
-fn handle_mouse_request(_event: mouse::MouseEvent) {
-    log::info!("received mouse event");
+fn handle_mouse_request(event: MouseEvent) {
+    if let Some(active_window) = active_window() {
+        if active_window.events.try_send(Event::Mouse(event)).is_err() {
+            log::info!("dropping mouse event");
+        }
+    }
+}
+
+fn active_window() -> Option<Arc<Inner>> {
+    // TODO: Get active window.
+    WINDOWS.read().as_ref().unwrap().get(&0).cloned()
 }

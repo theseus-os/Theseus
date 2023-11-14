@@ -4,14 +4,14 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use geometry::Coordinates;
 use graphics::{Framebuffer, Pixel};
 
-use crate::{Drawable, Settings};
+use crate::{Char, Drawable, Settings};
 
 pub struct Text<T>
 where
     T: AsRef<str>,
 {
-    pub coordinates: Coordinates,
     pub inner: T,
+    pub coordinates: Coordinates,
 }
 
 impl<T> Text<T>
@@ -37,8 +37,8 @@ impl<T> Text<T>
 where
     T: AsRef<str>,
 {
-    pub fn new(coordinates: Coordinates, inner: T) -> Self {
-        Self { coordinates, inner }
+    pub fn new(inner: T, coordinates: Coordinates) -> Self {
+        Self { inner, coordinates }
     }
 
     pub fn next_grid_position<P>(&self, framebuffer: &Framebuffer<P>) -> (usize, usize)
@@ -83,34 +83,6 @@ where
     {
         // IDEA: Some potential extensions: https://en.wikipedia.org/wiki/Font_rasterization
 
-        fn draw_character<P>(
-            framebuffer: &mut Framebuffer<P>,
-            character: char,
-            coordinates: Coordinates,
-            settings: &Settings<P>,
-        ) where
-            P: Pixel,
-        {
-            fn is_set(character: char, coordinates: Coordinates) -> bool {
-                font::FONT_BASIC[character as usize][coordinates.y] & (0x80 >> coordinates.x) != 0
-            }
-
-            // TODO: Optimise
-
-            for row in 0..CHARACTER_HEIGHT {
-                for col in 0..CHARACTER_HEIGHT {
-                    // The coordinates relative to the top left of the charter.
-                    let relative = Coordinates::new(col, row);
-
-                    if is_set(character, relative) {
-                        framebuffer.set(coordinates + relative, settings.foreground);
-                    } else if let Some(background) = settings.background {
-                        framebuffer.set(coordinates + relative, background);
-                    }
-                }
-            }
-        }
-
         let grid_width = Self::grid_width(framebuffer);
         let grid_height = Self::grid_height(framebuffer);
 
@@ -128,7 +100,11 @@ where
             } else {
                 let coordinates = self.coordinates
                     + Coordinates::new(column * CHARACTER_WIDTH, row * CHARACTER_HEIGHT);
-                draw_character(framebuffer, c, coordinates, settings);
+                Char {
+                    coordinates,
+                    inner: c,
+                }
+                .draw(framebuffer, settings);
 
                 column += 1;
 

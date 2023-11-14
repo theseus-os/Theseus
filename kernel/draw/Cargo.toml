@@ -7,3 +7,4 @@ edition = "2021"
 font = { path = "../font" }
 geometry = { path = "../../libs/geometry" }
 graphics = { path = "../graphics" }
+log = "0.4.8"

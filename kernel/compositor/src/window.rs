@@ -87,6 +87,9 @@ impl Window {
         Rectangle::new(Coordinates::ORIGIN, 0x500, 0x400)
     }
 
+    // TODO: Modify async_channel API so that we can create receivers, and then just
+    //  have a method `events` which returns a receiver.
+
     pub async fn recv(&self) -> Event {
         self.inner.events.recv().await
     }
@@ -103,7 +106,8 @@ impl Window {
     //
     // As it currently stands, the client must wait for the compositor to release
     // the buffer before doing anything else. This isn't too bad, as we don't have
-    // graphics-intesive applications, but it's something that could be improved on.
+    // graphics-intensive applications, but it's something that could be improved
+    // on.
     //
     // `refresh` could be done in a two-step process, returning a future that itself
     // returns a future. The first future would send the request, and the second
@@ -144,12 +148,9 @@ impl Window {
         });
         blocker.block();
     }
-
-    pub async fn event(&self) {
-        todo!();
-    }
 }
 
+/// Future returned by [`Window::refresh`].
 pub struct Refresh<'a> {
     locked: &'a RwLock<LockedInner>,
     id: usize,

@@ -1,6 +1,6 @@
 use super::*;
 use time::{Duration, Instant};
-use draw::{Coordinates, Settings, Text, Rectangle, Drawable};
+use draw::{Coordinates, Settings, Text, Rectangle, Drawable, Char};
 
 /// The cursor structure used in the terminal.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
@@ -89,7 +89,7 @@ impl Cursor {
                     background: Some(FONT_BACKGROUND_COLOR.into()),
                 };
                 let coordinates = coordinates + Coordinates::new(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT);
-                Text::new(coordinates, "a").draw(framebuffer, &settings);
+                Char::new(self.underlying_char as char, coordinates).draw(framebuffer, &settings);
             }
         }
 
