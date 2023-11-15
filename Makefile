@@ -323,11 +323,14 @@ endif
 ## This target invokes the actual Rust build process via `cargo`.
 cargo:
 ifeq ($(std),yes)
-	if [ ! -d $(RUST_SOURCE) ] ; then \
-		git clone https://github.com/theseus-os/rust.git --branch theseus-std-5 $(RUST_SOURCE); \
-		git -c $(RUST_SOURCE) checkout 3167b29; \
-		git -c $(RUST_SOURCE) sumbodule update --init; \
+##  We need enough history to include one upstream commit, so that bootstrap can find a commit hash
+##  for downloading LLVM.
+	@if [ ! -d $(RUST_SOURCE) ] ; then \
+		git clone https://github.com/theseus-os/rust.git --branch theseus-std-5 $(RUST_SOURCE) --depth 50; \
 	fi
+
+	git -C $(RUST_SOURCE) checkout 3167b29
+	git -C $(RUST_SOURCE) submodule update --init --depth 1
 
 ##  Cache std/Cargo.toml
 	cp $(RUST_SOURCE)/library/std/Cargo.toml $(ROOT_DIR)/std-cargo.toml
