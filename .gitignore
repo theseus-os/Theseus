@@ -39,3 +39,6 @@ github_pages/doc/
 
 # library lock files
 /libs/**/Cargo.lock
+
+# macOS directory stores
+/**/.DS_Store
