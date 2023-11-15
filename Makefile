@@ -325,10 +325,9 @@ cargo:
 ifeq ($(std),yes)
 	if [ ! -d $(RUST_SOURCE) ] ; then \
 		git clone https://github.com/theseus-os/rust.git --branch theseus-std-5 $(RUST_SOURCE); \
+		git -c $(RUST_SOURCE) checkout 3167b29; \
 		git -c $(RUST_SOURCE) sumbodule update --init; \
 	fi
-
-	echo "yo"
 
 ##  Cache std/Cargo.toml
 	cp $(RUST_SOURCE)/library/std/Cargo.toml $(ROOT_DIR)/std-cargo.toml
