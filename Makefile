@@ -25,6 +25,11 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
+std ?= no
+
+ifeq ($(std),yes)
+	export override FEATURES+=--features std
+endif
 
 ## aarch64 only supports booting via UEFI
 ifeq ($(ARCH),aarch64)
@@ -315,7 +320,16 @@ endif
 ### end of "build" target ###
 #############################
 
-std:
+## This target invokes the actual Rust build process via `cargo`.
+cargo:
+ifeq ($(std),yes)
+	if [ ! -d $(RUST_SOURCE) ] ; then \
+		git clone https://github.com/theseus-os/rust.git --branch theseus-std-5 $(RUST_SOURCE); \
+		git -c $(RUST_SOURCE) sumbodule update --init; \
+	fi
+
+	echo "yo"
+
 ##  Cache std/Cargo.toml
 	cp $(RUST_SOURCE)/library/std/Cargo.toml $(ROOT_DIR)/std-cargo.toml
 ##	Remove the last line of std/Cargo.toml
@@ -339,9 +353,10 @@ std:
 	@mkdir -p $(ROOT_DIR)/.cargo
 	@echo "[build]" > $(ROOT_DIR)/.cargo/config.toml
 	@echo "rustc = \"$(RUST_SOURCE)/build/$(HOST_TRIPLE)/stage1/bin/rustc\"" >> $(ROOT_DIR)/.cargo/config.toml
+else
+	@rm -f $(ROOT_DIR)/.cargo/config.toml
+endif
 
-## This target invokes the actual Rust build process via `cargo`.
-cargo: std
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
@@ -652,7 +667,8 @@ else ifeq ($(ARCH),aarch64)
 clippy : export override FEATURES := $(subst --workspace,,$(FEATURES))
 endif
 clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
-clippy: std
+clippy:
+	@rm -f $(ROOT_DIR)/.cargo/config.toml
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 		cargo clippy \
 		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \

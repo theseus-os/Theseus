@@ -84,13 +84,18 @@ pub fn take_current_tls_destructors() -> Vec<TlsObjectDestructor> {
 /// TLS destructors that should be run when that task exits.
 /// 
 /// # Arguments
-/// * `a`: the pointer to the object that will be destructed.
+///
+/// * `object_ptr`: the pointer to the object that will be destructed.
 /// * `dtor`: the function that should be invoked to destruct the object pointed to by `a`.
 ///   When the current task exits, this function will be invoked with `a`
 ///   as its only argument, at which point the `dtor` function should drop `a`.
 /// 
 /// Currently the only value of `dtor` that is used is a type-specific monomorphized
 /// version of the above [`fast::destroy_value()`] function.
+///
+/// # Safety
+///
+/// `object_ptr` must point to a valid object, and `dtor` must be the destructor for that object.
 pub unsafe fn register_dtor(object_ptr: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
     TLS_DESTRUCTORS.borrow_mut().push(TlsObjectDestructor { object_ptr, dtor });
 }

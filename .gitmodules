@@ -22,6 +22,3 @@
 	path = libs/core2
 	url = https://github.com/theseus-os/core2.git
 	shallow = true
-[submodule "ports/rust"]
-	path = ports/rust
-	url = https://github.com/theseus-os/rust.git

@@ -3,6 +3,7 @@
 //! See the `shim` crate for more details.
 
 #![no_std]
+#![allow(clippy::missing_safety_doc)]
 
 extern crate alloc;
 

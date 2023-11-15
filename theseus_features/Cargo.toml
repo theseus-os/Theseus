@@ -102,6 +102,7 @@ everything = [
     "theseus_std",
     "theseus_tests",
     "wasmtime",
+    # The `std` feature is intentionally omitted as it is still in development.
 ]
 
 ## Includes `wasmtime`, the WebAssembly (WASM) runtime, in the build.
@@ -162,7 +163,6 @@ theseus_tests = [
     "test_preemption_counter",
     "test_restartable",
     "test_scheduler",
-    "test_std",
     "test_std_fs",
     "test_sync_block",
     "test_task_cancel",
@@ -170,4 +170,8 @@ theseus_tests = [
     "test_wait_queue",
     "test_wasmtime",
     "unwind_test",
+]
+
+std = [
+    "test_std",
 ]
