@@ -30,6 +30,7 @@ use core::{
 use log::debug;
 use super::{
     Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
+    Page4K,
     AllocatedPages, allocate_pages, AllocatedFrames, UnmappedFrames, PteFlags,
     InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
     get_p4, find_section_memory_bounds,
@@ -214,7 +215,7 @@ impl PageTable {
 
 
 /// Returns the current top-level (P4) root page table frame.
-pub fn get_current_p4() -> Frame {
+pub fn get_current_p4() -> Frame<Page4K> {
     Frame::containing_address(get_p4())
 }
 

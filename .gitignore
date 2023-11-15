@@ -40,6 +40,9 @@ github_pages/doc/
 # library lock files
 /libs/**/Cargo.lock
 
+# macOS directory stores
+/**/.DS_Store
+
 # TODO: Remove once std is upstreamed
 .cargo/
 /ports/rust
