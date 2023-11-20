@@ -190,10 +190,7 @@ pub fn stderr() -> Result<Writer> {
     })
 }
 
-// TODO: Should we be taking a mutable or immutable reference?
-//
-// Technically, speaking I don't think we need to take a mutable reference, but
-// that limits our options in the future.
+// NOTE: The references below don't need to be mutable.
 
 #[inline]
 pub fn read(reader: &mut Reader, buf: &mut [u8]) -> Result<usize> {
