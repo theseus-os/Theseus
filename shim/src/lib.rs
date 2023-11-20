@@ -190,7 +190,7 @@ pub fn stderr() -> Result<Writer> {
     })
 }
 
-// NOTE: The references below don't need to be mutable.
+// NOTE: The references to self below don't need to be mutable.
 
 #[inline]
 pub fn read(reader: &mut Reader, buf: &mut [u8]) -> Result<usize> {
