@@ -45,4 +45,4 @@ github_pages/doc/
 
 # TODO: Remove once std is upstreamed
 .cargo/
-/ports/rust
+/rust

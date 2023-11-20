@@ -32,6 +32,7 @@ default-members = [
 exclude = [
 	"shim",
 	"applications/test_std",
+	"rust",
 
 	## Exclude the build directories
 	"build",

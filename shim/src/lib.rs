@@ -147,8 +147,6 @@ pub unsafe fn register_dtor(t: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
     c::register_dtor(t, dtor)
 }
 
-// TODO: impl Send + Sync for Reader and Writer?
-
 pub struct Reader {
     inner: FatPointer,
 }

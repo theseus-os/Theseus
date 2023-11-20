@@ -29,6 +29,9 @@ std ?= no
 
 ifeq ($(std),yes)
 	export override FEATURES+=--features std
+	export override BUILD_STD_CARGOFLAGS += -Zbuild-std
+else
+	export override BUILD_STD_CARGOFLAGS += -Zbuild-std=core,alloc
 endif
 
 ## aarch64 only supports booting via UEFI
@@ -74,7 +77,7 @@ THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES             := $(ROOT_DIR)/extra_files
 LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
-RUST_SOURCE             := $(ROOT_DIR)/ports/rust
+RUST_SOURCE             := $(ROOT_DIR)/rust
 
 
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
@@ -329,7 +332,7 @@ ifeq ($(std),yes)
 		git clone https://github.com/theseus-os/rust.git --branch theseus-std-5 $(RUST_SOURCE) --depth 50; \
 	fi
 
-	git -C $(RUST_SOURCE) checkout 3167b29
+	git -C $(RUST_SOURCE) checkout 2a8008fe9b
 	git -C $(RUST_SOURCE) submodule update --init --depth 1
 
 ##  Cache std/Cargo.toml
@@ -339,7 +342,7 @@ ifeq ($(std),yes)
 	@mv $(ROOT_DIR)/temp-std-cargo.toml $(RUST_SOURCE)/library/std/Cargo.toml
 ##	Add the correct dependency path, since the dependency path in std/Cargo.toml assumes that std is
 ##	being built using -Zbuild-std.
-	@echo "theseus-shim = { path = \"../../../../shim\", features = ['rustc-dep-of-std'] }" >> $(RUST_SOURCE)/library/std/Cargo.toml
+	@echo "theseus-shim = { path = \"../../../shim\", features = ['rustc-dep-of-std'] }" >> $(RUST_SOURCE)/library/std/Cargo.toml
 
 ##	Build the compiler
 	@cd $(RUST_SOURCE) && RUSTFLAGS="" CARGOFLAGS="" ./x.py build library --stage 1
