@@ -218,12 +218,13 @@ pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
 }
 
 pub fn init_pci_interrupts(handler: InterruptHandler) -> Result<(), &'static str> {
-    let int_ctrl = SystemInterruptController::get();
+    let int_ctrl = SystemInterruptController::get()
+        .ok_or("SystemInterruptController was not yet initialized")?;
     let dst = Some(cpu::bootstrap_cpu().unwrap());
 
     for int_num in BOARD_CONFIG.pci_intx {
         if let Err(existing_handler) = register_interrupt(int_num, handler) {
-            if handler as *const InterruptHandler != existing_handler {
+            if handler as InterruptHandler != existing_handler {
                 return Err("A different interrupt handler has already been setup for that IPI");
             }
         }
