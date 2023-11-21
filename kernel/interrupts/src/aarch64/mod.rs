@@ -249,33 +249,6 @@ pub fn init_pci_interrupts(handler: InterruptHandler) -> Result<(), &'static str
     Ok(())
 }
 
-/// Disables the timer, schedules its next tick, and re-enables it
-pub fn schedule_next_timer_tick() {
-    enable_timer(false);
-    CNTP_TVAL_EL0.set(get_timeslice_ticks());
-    enable_timer(true);
-}
-
-/// Enables/Disables the System Timer via the dedicated Arm System Registers
-pub fn enable_timer(enable: bool) {
-    // unmask the interrupt & enable the timer
-    CNTP_CTL_EL0.write(
-          CNTP_CTL_EL0::IMASK.val(0)
-        + CNTP_CTL_EL0::ENABLE.val(match enable {
-            true => 1,
-            false => 0,
-        })
-    );
-
-    /* DEBUGGING CODE
-
-    info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
-    info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
-    info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
-
-    */
-}
-
 /// Registers an interrupt handler at the given IRQ interrupt number.
 ///
 /// The function fails if the interrupt number is reserved or is already in use.
