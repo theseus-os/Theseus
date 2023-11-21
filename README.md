@@ -104,8 +104,10 @@ If you're on WSL, also do the following steps:
     ```sh
     rm -rf /tmp/theseus_tools_src
     ```
-
-  * If you're building Theseus on an M1-based Mac, you may need to use `gmake` instead of `make` for build commands. Alternatively, you can use `bash` with x86 emulation, but this is generally not necessary. 
+  * **NOTE**: on MacOS, you need to run `gmake` instead of `make` for build commands (or you can simply create a shell alias).
+    * This is because HomeBrew installs its binaries in a way that doesn't conflict with built-in versions of system utilities.
+  
+  * *(This is typically not necessary)*: if you're building Theseus on older Apple Silicon (M1 chips), you may need to use `bash` with x86 emulation:
     ```sh
     arch -x86_64 bash   # or another shell of your choice
     ```
