@@ -6,6 +6,13 @@
 //!    * interrupt transfers: full support
 //!    * bulk: unused, no API support
 //!    * isochronous transfers: unused, no API support
+//!
+//! Specfications:
+//! * [USB 2.0](https://www.pjrc.com/teensy/beta/usb20.pdf)
+//! * [xHCI](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf)
+//! * [EHCI](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/ehci-specification-for-usb.pdf)
+//! * [UHCI](https://stuff.mit.edu/afs/sipb/contrib/doc/specs/protocol/usb/UHCI11D.PDF)
+//! * [OHCI](http://www.o3one.org/hwdocs/usb/hcir1_0a.pdf)
 
 #![no_std]
 #![allow(unused)]
