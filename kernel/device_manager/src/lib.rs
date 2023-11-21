@@ -128,6 +128,8 @@ pub fn init(
             // Serial Bus Controller
             if dev.subclass == 0x03 {
                 // USB controller
+                // Note: only aarch64 is supported due to use of legacy PCI interrupts
+                #[cfg(target_arch = "aarch64")]
                 if dev.prog_if == 0x20 {
                     // EHCI
                     usb::init_pci(dev, usb::ControllerType::Ehci)?;

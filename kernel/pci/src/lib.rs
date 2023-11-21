@@ -3,6 +3,9 @@
 //! Note: while pci currently uses port-io on x86 and mmio on aarch64,
 //! x86 may also support memory-based PCI configuration in the future;
 //! port-io is the legacy way to access the config space.
+//!
+//! For context on the various interrupt mechanisms (MSI/MSI-X/INTx):
+//! https://electronics.stackexchange.com/a/343218
 
 #![no_std]
 #![allow(dead_code)]
@@ -18,14 +21,17 @@ use bit_field::BitField;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use cpu::CpuId;
-use interrupts::{InterruptNumber, EoiBehaviour, interrupt_handler, init_pci_interrupts};
+use interrupts::InterruptNumber;
 use sync_irq::RwLock;
 
 #[cfg(target_arch = "x86_64")]
 use port_io::Port;
 
 #[cfg(target_arch = "aarch64")]
-use arm_boards::BOARD_CONFIG;
+use {
+    arm_boards::BOARD_CONFIG,
+    interrupts::{EoiBehaviour, interrupt_handler, init_pci_interrupts},
+};
 
 #[derive(Debug, Copy, Clone)]
 /// The span of bytes within a 4-byte chunk that a PCI register occupies.
@@ -210,13 +216,15 @@ pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'s
     Ok(get_pci_buses()?.iter().flat_map(|b| b.devices.iter()))
 }
 
-// Architecture-independent PCI interrupt handler
-interrupt_handler!(pci_int_handler, None, _stack_frame, {
-    // this would fail if pci devices were uninitialized & there was an error initializing them
-    // we expect them to be initialized at this point.
-    let devices = pci_device_iter().expect("Uninitialized PCI buses");
+static INTX_DEVICES: RwLock<Vec<&'static PciDevice>> = RwLock::new(Vec::new());
 
-    for device in devices {
+// Architecture-independent PCI interrupt handler
+// Aarch64-only because legacy interrupts aren't supported on x86
+#[cfg(target_arch = "aarch64")]
+interrupt_handler!(pci_int_handler, None, _stack_frame, {
+    let devices = INTX_DEVICES.read();
+
+    for device in &*devices {
         if device.pci_get_interrupt_status(true) {
             device.pci_enable_interrupts(false);
             log::info!("Device {} triggered an interrupt", device.location);
@@ -234,7 +242,10 @@ interrupt_handler!(pci_int_handler, None, _stack_frame, {
 
 /// Initializes the PCI interrupt handler
 pub fn init() -> Result<(), &'static str> {
-    init_pci_interrupts(pci_int_handler)
+    #[cfg(target_arch = "aarch64")]
+    init_pci_interrupts(pci_int_handler)?;
+
+    Ok(())
 }
 
 /// A PCI bus, which contains a list of PCI devices on that bus.
@@ -317,6 +328,8 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
                     location,
                     interrupt_waker: RwLock::new(None),
                 };
+
+                device.pci_enable_interrupts(false);
 
                 device_list.push(device);
             }
@@ -884,9 +897,16 @@ impl PciDevice {
     /// Sets a a task waker to be used when this device triggers an interrupt
     ///
     /// Returns the previous interrupt waker for this device, if there was one.
-    pub fn set_interrupt_waker(&self, waker: Waker) -> Option<Waker> {
+    pub fn set_interrupt_waker(&'static self, waker: Waker) -> Option<Waker> {
         let mut handle = self.interrupt_waker.write();
-        handle.replace(waker)
+        let prev_value = handle.replace(waker);
+
+        if let None = prev_value {
+            let mut intx_devices = INTX_DEVICES.write();
+            intx_devices.push(self)
+        }
+
+        prev_value
     }
 }
 
