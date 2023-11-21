@@ -38,6 +38,7 @@ pub const BOARD_CONFIG: BoardConfig = BoardConfig {
     pl011_base_addresses: [ PhysicalAddress::new_canonical(0x09000000) ],
     pl011_rx_spi: 33,
     cpu_local_timer_ppi: 30,
+    pci_intx: [35, 36, 37, 38],
 
     // obtained via internal qemu debugging
     // todo: will this always be correct?
