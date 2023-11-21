@@ -902,7 +902,7 @@ impl PciDevice {
         let mut handle = self.interrupt_waker.write();
         let prev_value = handle.replace(waker);
 
-        if let None = prev_value {
+        if prev_value.is_none() {
             let mut intx_devices = INTX_DEVICES.write();
             intx_devices.push(self)
         }
