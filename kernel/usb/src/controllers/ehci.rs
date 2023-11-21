@@ -49,6 +49,7 @@ pub struct EhciController {
     usb_alloc: BorrowedMappedPages<UsbAlloc, Mutable>,
     pending_int_transfers: Vec<InterruptTransfer>,
     interfaces: Vec<Option<interfaces::Interface>>,
+    initialized: bool,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -78,7 +79,7 @@ impl ControllerApi for EhciController {
         for i in 0..port_num {
             let port = &mut self.op_regs.ports[i];
             log::error!("P{}.connected_change: {}", i, port.read().connected_change());
-            if port.read().connected_change() {
+            if port.read().connected_change() || !self.initialized {
                 // writing true makes it false (spec)
                 port.update(|port| port.set_connected_change(true));
 
@@ -113,6 +114,8 @@ impl ControllerApi for EhciController {
                 }
             }
         }
+
+        self.initialized = true;
 
         Ok(())
     }
@@ -329,6 +332,7 @@ impl EhciController {
             usb_alloc,
             pending_int_transfers: Vec::new(),
             interfaces: Vec::new(),
+            initialized: false,
         })
     }
 
