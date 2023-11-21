@@ -76,7 +76,6 @@ test_wasmtime = { path = "../applications/test_wasmtime", optional = true }
 bm = { path = "../applications/bm", optional = true }
 channel_eval = { path = "../applications/channel_eval", optional = true }
 heap_eval = { path = "../applications/heap_eval", optional = true }
-rq_access_eval = { path = "../applications/rq_access_eval",  optional = true }
 rq_eval = { path = "../applications/rq_eval",  optional = true }
 scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
 
@@ -138,7 +137,6 @@ theseus_benchmarks = [
     "bm",
     "channel_eval",
     "heap_eval",
-    "rq_access_eval",
     "rq_eval",
     "scheduler_eval",
 ]

@@ -72,5 +72,5 @@ extern "x86-interrupt" fn pit_timer_handler(_stack_frame: InterruptStackFrame) {
     let ticks = PIT_TICKS.fetch_add(1, Ordering::Acquire);
     trace!("PIT timer interrupt, ticks: {}", ticks);
 
-    interrupts::eoi(Some(PIT_CHANNEL_0_IRQ));
+    interrupts::eoi(PIT_CHANNEL_0_IRQ);
 }

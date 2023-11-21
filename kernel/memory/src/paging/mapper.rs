@@ -18,6 +18,7 @@ use core::{
     slice,
 };
 use log::{error, warn, debug, trace};
+use memory_structs::{PageSize, Page4K};
 use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames, UnmappedFrames}; 
 use crate::paging::{
     get_current_p4,
@@ -50,7 +51,8 @@ use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 /// This is safe because the frame allocator can only be initialized once, and also because
 /// only this crate has access to that function callback and can thus guarantee
 /// that it is only invoked for `UnmappedFrameRange`.
-pub(super) static INTO_UNMAPPED_FRAMES_FUNC: Once<fn(FrameRange) -> UnmappedFrames> = Once::new();
+pub(super) static INTO_UNMAPPED_FRAMES_FUNC:
+    Once<  fn(FrameRange<Page4K>) -> UnmappedFrames<Page4K>  > = Once::new();
 
 /// A convenience function to translate the given virtual address into a
 /// physical address using the currently-active page table.
@@ -61,7 +63,7 @@ pub fn translate(virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
     /// The Frame contaning the top-level P4 page table.
-    pub(crate) target_p4: Frame,
+    pub(crate) target_p4: Frame<Page4K>,
 }
 
 impl Mapper {
@@ -75,7 +77,7 @@ impl Mapper {
     /// to map the given `p4` frame.
     ///
     /// The given `p4` frame is the root frame of that upcoming page table.
-    pub(crate) fn with_p4_frame(p4: Frame) -> Mapper {
+    pub(crate) fn with_p4_frame(p4: Frame<Page4K>) -> Mapper {
         Mapper { 
             p4: Unique::new(P4).unwrap(), // cannot panic; the P4 value is valid
             target_p4: p4,
@@ -87,7 +89,7 @@ impl Mapper {
     /// to map that new page table.
     ///
     /// The given `p4` frame is the root frame of that upcoming page table.
-    pub(crate) fn upcoming(p4: Frame) -> Mapper {
+    pub(crate) fn upcoming(p4: Frame<Page4K>) -> Mapper {
         Mapper {
             p4: Unique::new(UPCOMING_P4).unwrap(),
             target_p4: p4,
@@ -141,6 +143,9 @@ impl Mapper {
     }
 
     /// Translates a virtual memory `Page` to a physical memory `Frame` by walking the page tables.
+    ///
+    /// Note that this only supports translating a 4K page into a 4K frame,
+    /// but it still correctly handles the cases where huge pages are used in the page tables.
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
         let p3 = self.p4().next_table(page.p4_index());
 
@@ -183,21 +188,76 @@ impl Mapper {
             .or_else(huge_page)
     }
 
+    /*
+     * An unfinished implementation of a generically-sized translate routine that handles huge pages.
+     *
+    /// Translates a virtual memory `Page` to a physical memory `Frame` by walking the page tables.
+    pub fn translate_page<P: PageSize>(&self, page: Page<P>) -> Option<Frame<P>> {
+        let p3 = self.p4().next_table(page.p4_index());
+
+        #[cfg(target_arch = "x86_64")]
+        let huge_page = || {
+            p3.and_then(|p3| {
+                let p3_entry = &p3[page.p3_index()];
+                // 1GiB page?
+                if let Some(start_frame) = p3_entry.pointed_frame() {
+                    if p3_entry.flags().is_huge() {
+                        // address must be 1GiB aligned
+                        assert!(start_frame.number() % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
+                        return Some(
+                            Frame::containing_address_1gb(PhysicalAddress::new_canonical(
+                                PAGE_SIZE * (start_frame.number() + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index())
+                            ))
+                            .from_1g_into_generic()
+                        );
+                    }
+                }
+                if let Some(p2) = p3.next_table(page.p3_index()) {
+                    let p2_entry = &p2[page.p2_index()];
+                    // 2MiB page?
+                    if let Some(start_frame) = p2_entry.pointed_frame() {
+                        if p2_entry.flags().is_huge() {
+                            // address must be 2MiB aligned
+                            assert!(start_frame.number() % ENTRIES_PER_PAGE_TABLE == 0);
+                            return Some(
+                                Frame::containing_address_2mb(PhysicalAddress::new_canonical(
+                                    PAGE_SIZE * (start_frame.number() + page.p1_index())
+                                ))
+                                .from_2m_into_generic()
+                            );
+                        }
+                    }
+                }
+                None
+            })
+        };
+        #[cfg(target_arch = "aarch64")]
+        let huge_page = || { todo!("huge page (block descriptor) translation for aarch64") };
+
+        p3.and_then(|p3| p3.next_table(page.p3_index()))
+            .and_then(|p2| p2.next_table(page.p2_index()))
+            .and_then(|p1| p1[page.p1_index()].pointed_frame())
+            .map(Frame::from_4k_into_generic)
+            .or_else(huge_page)
+    }
+    */
+
 
     /// An internal function that performs the actual mapping of a range of allocated `pages`
     /// to a range of allocated `frames`.
     /// 
     /// Returns a tuple of the new `MappedPages` object containing the allocated `pages`
     /// and the allocated `frames` object.
-    pub(super) fn internal_map_to<Frames, Flags>(
+    pub(super) fn internal_map_to<P, BF, FL>(
         &mut self,
-        pages: AllocatedPages,
-        frames: Frames,
-        flags: Flags,
-    ) -> Result<(MappedPages, Frames::Inner), &'static str> 
-    where
-        Frames: OwnedOrBorrowed<AllocatedFrames>,
-        Flags: Into<PteFlagsArch>,
+        pages: AllocatedPages/* <P> */,
+        frames: BF,
+        flags: FL,
+    ) -> Result<(MappedPages, BF::Inner), &'static str> 
+    where 
+        P: PageSize,
+        BF: OwnedOrBorrowed<AllocatedFrames<P>>,
+        FL: Into<PteFlagsArch>,
     {
         let frames = frames.into_inner();
         let flags = flags.into();
@@ -207,7 +267,7 @@ impl Mapper {
         // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
         let actual_flags = flags
             .valid(true)
-            .exclusive(Frames::OWNED);
+            .exclusive(BF::OWNED);
 
         let pages_count = pages.size_in_pages();
         let frames_count = frames.borrow().size_in_frames();
@@ -217,6 +277,8 @@ impl Mapper {
             );
             return Err("map_allocated_pages_to(): page count must equal frame count");
         }
+
+        // TODO FIXME: implement huge pages here.
 
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
@@ -246,12 +308,16 @@ impl Mapper {
     /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to<F: Into<PteFlagsArch>>(
+    pub fn map_allocated_pages_to<P, FL>(
         &mut self,
-        pages: AllocatedPages,
-        frames: AllocatedFrames,
-        flags: F,
-    ) -> Result<MappedPages, &'static str> {
+        pages: AllocatedPages /* <P> */,
+        frames: AllocatedFrames<P>,
+        flags: FL,
+    ) -> Result<MappedPages, &'static str>
+    where 
+        P: PageSize,
+        FL: Into<PteFlagsArch>,
+    {
         let (mapped_pages, frames) = self.internal_map_to(pages, Owned(frames), flags)?;
         
         // Currently we forget the actual `AllocatedFrames` object because
@@ -264,13 +330,17 @@ impl Mapper {
     }
 
 
-    /// Maps the given `AllocatedPages` to randomly chosen (allocated) physical frames.
-    /// 
+    /// Maps the given 4K-sized `AllocatedPages` to randomly chosen (allocated) physical frames.
+    ///
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages<F: Into<PteFlagsArch>>(
+    ///
+    /// ## Note on huge pages
+    /// This function only supports 4K-sized pages, not huge pages.
+    /// To use huge pages, you must provide the huge frames and call [`Self::map_allocated_pages_to()`].
+    pub fn map_allocated_pages<FL: Into<PteFlagsArch>>(
         &mut self,
         pages: AllocatedPages,
-        flags: F,
+        flags: FL,
     ) -> Result<MappedPages, &'static str> {
         let flags = flags.into();
         let higher_level_flags = flags.adjust_for_higher_level_pte();
@@ -325,11 +395,11 @@ impl Mapper {
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object
     /// which contains those `AllocatedPages`.
     #[doc(hidden)]
-    pub unsafe fn map_to_non_exclusive<F: Into<PteFlagsArch>>(
+    pub unsafe fn map_to_non_exclusive<FL: Into<PteFlagsArch>>(
         mapper: &mut Self,
         pages: AllocatedPages,
-        frames: &AllocatedFrames,
-        flags: F,
+        frames: &AllocatedFrames<Page4K>,
+        flags: FL,
     ) -> Result<MappedPages, &'static str> {
         // In this function, none of the frames can be mapped as exclusive
         // because we're accepting a *reference* to an `AllocatedFrames`, not consuming it.
@@ -337,6 +407,84 @@ impl Mapper {
             .map(|(mp, _af)| mp)
     }
 }
+
+
+/// A macro for applying the same field/method accessors to all variants
+/// in an enum based on the three possible [`PageSize`]s.
+#[macro_export]
+macro_rules! chunk_sized_expr {
+    ($t:ty, $chunk:ident, .$($method:tt)*) => {
+        match $chunk {
+            <$t>::Normal4K(c) => c.$($method)*,
+            <$t>::Huge2M(c)   => c.$($method)*,
+            <$t>::Huge1G(c)   => c.$($method)*,
+        }
+    };
+}
+
+/// A version of [`AllocatedPages`] that encodes its [`PageSize`] with internal enum variants.
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum AllocatedPagesSized {
+    // TODO: support huge pages via the `P: PageSize` parameter.
+
+    /// A range of normal 4K-sized allocated pages.
+    Normal4K(AllocatedPages /* <Page4K> */),
+    /// A range of huge 2M-sized allocated pages.
+    Huge2M(AllocatedPages /* <Page2M> */),
+    /// A range of huge 1G-sized allocated pages.
+    Huge1G(AllocatedPages /* <Page1G> */),
+}
+impl Default for AllocatedPagesSized {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+impl From<AllocatedPages/* <Page4K >*/> for AllocatedPagesSized {
+    fn from(p: AllocatedPages/* <Page4K >*/) -> Self {
+        Self::Normal4K(p)
+    }
+}
+/*
+ * TODO: support huge pages via the `P: PageSize` parameter.
+ * 
+impl From<AllocatedPages<Page2M>> for AllocatedPagesSized {
+    fn from(p: AllocatedPages<Page2M>) -> Self {
+        Self::Huge2M(chunk)
+    }
+}
+impl From<AllocatedPages<Page1G>> for AllocatedPagesSized {
+    fn from(p: AllocatedPages<Page1G>) -> Self {
+        Self::Huge1G(chunk)
+    }
+}
+*/
+#[allow(dead_code)]
+impl AllocatedPagesSized {
+    /// Returns an empty `AllocatedPagesSized` object that performs no page allocation. 
+    /// Can be used as a placeholder, but will not permit any real usage. 
+    pub const fn empty() -> Self {
+        Self::Normal4K(AllocatedPages::empty())
+    }
+    /// Returns the 4K-sized number of the starting page of the enclosed `AllocatedPages`.
+    pub const fn number(&self) -> usize {
+        chunk_sized_expr!(Self, self, .start().number())
+    }
+    /// Returns the virtual address of the starting page of the enclosed `AllocatedPages`.
+    pub const fn start_address(&self) -> VirtualAddress {
+        chunk_sized_expr!(Self, self, .start_address())
+    }
+    /// Converts this into a 4K-sized `AllocatedPages`.
+    pub fn into_4k(self) -> AllocatedPages /* <Page4K> */ {
+        // To make this a const fn, we cannot use the implementations of `Into`.
+        match self {
+            Self::Normal4K(p) => p,
+            Self::Huge2M(p)   => p, /* TODO: support huge page range conversions */
+            Self::Huge1G(p)   => p, /* TODO: support huge page range conversions */
+        }
+    }
+}           
+
 
 
 /// Represents a contiguous range of virtual memory pages that are currently mapped. 
@@ -350,7 +498,7 @@ impl Mapper {
 #[derive(Debug)]
 pub struct MappedPages {
     /// The Frame containing the top-level P4 page table that this MappedPages was originally mapped into. 
-    page_table_p4: Frame,
+    page_table_p4: Frame<Page4K>,
     /// The range of allocated virtual pages contained by this mapping.
     pages: AllocatedPages,
     // The PTE flags that define the page permissions of this mapping.

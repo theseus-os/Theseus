@@ -1,0 +1,12 @@
+[package]
+name = "uart_pl011"
+authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
+description = "Simple Driver for PL011 UARTs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.8"
+volatile = "0.2.7"
+zerocopy = "0.5.0"
+memory = { path = "../memory" }

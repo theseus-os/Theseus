@@ -317,8 +317,11 @@ impl File {
             let parent_dir_of_file = path.parent()
                 .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
 
-            let theseus_file_path = theseus_path::Path::new(path.to_string_lossy().into());
-            let theseus_dir_path  = theseus_path::Path::new(parent_dir_of_file.to_string_lossy().into());
+            let cow_file_path = path.to_string_lossy();
+            let theseus_file_path: &theseus_path::Path = cow_file_path.as_ref().as_ref();
+
+            let cow_dir_path = parent_dir_of_file.to_string_lossy();
+            let theseus_dir_path: &theseus_path::Path = cow_dir_path.as_ref().as_ref();
             
             // `create_new` requires that the file must not previously exist at all.
             if opts.create_new && theseus_file_path.get(&curr_dir).is_some() {
@@ -350,7 +353,7 @@ impl File {
         // Handle accessing a file that must exist (in any mode)
         else if opts.read || opts.write || opts.append {
             let working_dir = crate::env::current_dir()?;
-            theseus_path::Path::new(path.to_string_lossy().into()).get(&working_dir)
+            theseus_path::Path::new(path.to_string_lossy().as_ref()).get(&working_dir)
                 .ok_or(io::ErrorKind::NotFound.into())
                 .map(|theseus_file_or_dir| match theseus_file_or_dir {
                     theseus_fs_node::FileOrDir::File(f) => theseus_file_ref_to_file(f, opts.clone()),

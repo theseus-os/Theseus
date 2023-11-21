@@ -33,7 +33,7 @@ use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
 use task_struct::ExposedTask;
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
-use path::Path;
+use path::{Path, PathBuf};
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
 use no_drop::NoDrop;
@@ -59,11 +59,17 @@ pub fn init(
         .spawn_restartable(None)?
         .clone();
 
-    runqueue::init(cpu_id.into_u8(), idle_task)?;
-    runqueue::add_task_to_specific_runqueue(
-        cpu_id.into_u8(),
-        exitable_bootstrap_task.clone(),
-    )?;
+    cfg_if::cfg_if! {
+        if #[cfg(epoch_scheduler)] {
+            let scheduler = scheduler_epoch::Scheduler::new(idle_task);
+        } else if #[cfg(priority_scheduler)] {
+            let scheduler = scheduler_priority::Scheduler::new(idle_task);
+        } else {
+            let scheduler = scheduler_round_robin::Scheduler::new(idle_task);
+        }
+    }
+    task::scheduler::set_policy(cpu_id, scheduler);
+    task::scheduler::add_task_to(cpu_id, exitable_bootstrap_task.clone());
 
     Ok(BootstrapTaskRef {
         cpu_id,
@@ -207,7 +213,7 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 ///    If not provided, the new Task will be spawned within the same namespace as the current task.
 /// 
 pub fn new_application_task_builder(
-    crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
+    crate_object_file: &Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
@@ -216,7 +222,7 @@ pub fn new_application_task_builder(
         .ok_or("spawn::new_application_task_builder(): couldn't get current task")?;
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
-        .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
+        .or_else(|| PathBuf::from(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
     {
         Some(FileOrDir::File(f)) => f,
         _ => return Err("Couldn't find specified file path for new application crate"),
@@ -439,9 +445,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Idle tasks are not stored on the run queue.
         if !self.idle {
             if let Some(cpu) = self.pin_on_cpu {
-                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
+                task::scheduler::add_task_to(cpu, task_ref.clone());
             } else {
-                runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+                task::scheduler::add_task(task_ref.clone());
             }
         }
 
@@ -877,13 +883,13 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill
 #[inline(always)]
 fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
     // First, remove the task from its runqueue(s).
-    remove_current_task_from_runqueue(current_task);
+    task::scheduler::remove_task_from_current(current_task);
 
     // Second, run TLS object destructors, which will drop any TLS objects
     // that were lazily initialized during this execution of this task.
     for tls_dtor in thread_local_macro::take_current_tls_destructors().into_iter() {
         unsafe {
-            (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
+            (tls_dtor.dtor)(tls_dtor.object_ptr);
         }
     }
 
@@ -994,21 +1000,7 @@ where
 
 /// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
-    // Special behavior when evaluating runqueues
-    #[cfg(rq_eval)] {
-        runqueue::remove_task_from_all(current_task).unwrap();
-    }
-
-    // In the regular case, we do not perform task migration between cores,
-    // so we can use the heuristic that the task is only on the current core's runqueue.
-    #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
-            .ok_or("couldn't get this CPU's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(current_task)) 
-        {
-            error!("BUG: couldn't remove exited task from runqueue: {}", e);
-        }
-    }
+    task::scheduler::remove_task(current_task);
 }
 
 /// A basic idle task that does nothing but loop endlessly.

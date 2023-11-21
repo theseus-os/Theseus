@@ -21,7 +21,7 @@ use rustc_demangle::demangle;
 use qp_trie::Trie;
 use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
-use path::Path;
+use path::{Path, PathBuf};
 use memfs::MemFile;
 use hashbrown::HashMap;
 use crate_metadata_serde::{CLS_SECTION_FLAG, CLS_SYMBOL_TYPE};
@@ -141,7 +141,7 @@ fn parse_bootloader_modules_into_files(
 
     // Closure to create the directory for a new namespace.
     let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
-        VFSDirectory::create(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
+        VFSDirectory::create(dir_name.to_string(), &namespaces_dir).map(NamespaceDir)
     };
 
     let mut process_module = |name: &str, size, pages| -> Result<_, &'static str> {
@@ -387,7 +387,7 @@ pub enum IntoCrateObjectFile {
     /// A direct reference to the crate object file. This will be used as-is. 
     File(FileRef),
     /// An absolute path that points to the crate object file. 
-    AbsolutePath(Path),
+    AbsolutePath(PathBuf),
     /// A string prefix that will be used to search for the crate object file in the namespace.
     /// This must be able to uniquely identify a single crate object file in the namespace directory (recursively searched). 
     Prefix(String),
@@ -1052,8 +1052,11 @@ impl CrateNamespace {
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.len();
-        let abs_path      = Path::new(crate_file.get_absolute_path());
-        let crate_name    = StrRef::from(crate_name_from_path(&abs_path));
+        let abs_path      = PathBuf::from(crate_file.get_absolute_path());
+        let crate_name    = StrRef::from(
+            crate_name_from_path(&abs_path)
+                .ok_or("failed to get crate name from path")?
+        );
 
         // First, check to make sure this crate hasn't already been loaded. 
         // Application crates are now added to the CrateNamespace just like kernel crates,
@@ -1082,13 +1085,27 @@ impl CrateNamespace {
             return Err("not a relocatable elf file");
         }
 
-        // If a `.theseus_merged` section exists, then the object file's sections have been merged by a partial relinking step.
+        // If a `.theseus_merged` section exists (it should come before any .text section),
+        // then the object file's sections have been merged by a partial relinking step.
         // If so, then we can use a much faster version of loading/linking.
         const THESEUS_MERGED_SEC_NAME: &str = ".theseus_merged";
-        const THESEUS_MERGED_SEC_SHNDX: u16 = 1;
-        let sections_are_merged = elf_file.section_header(THESEUS_MERGED_SEC_SHNDX)
-            .map(|sec| sec.get_name(&elf_file) == Ok(THESEUS_MERGED_SEC_NAME))
-            .unwrap_or(false);
+        let sections_are_merged = {
+            let mut found = false;
+            for sec_name in elf_file
+                .section_iter()
+                .filter_map(|sec| sec.get_name(&elf_file).ok())
+            {
+                if sec_name == THESEUS_MERGED_SEC_NAME {
+                    found = true;
+                    break;
+                }
+                else if sec_name.starts_with(TEXT_SECTION_NAME) {
+                    found = false;
+                    break;
+                }
+            }
+            found
+        };
 
         // Allocate enough space to load the sections
         let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
@@ -2839,9 +2856,9 @@ impl CrateNamespace {
             // The object files from the recursive namespace(s) are appended after the files in the initial namespace,
             // so they'll only be searched if the symbol isn't found in the current namespace.
             for (potential_crate_file, ns_of_crate_file) in self.method_get_crate_object_files_starting_with(&potential_crate_name) {
-                let potential_crate_file_path = Path::new(potential_crate_file.lock().get_absolute_path());
+                let potential_crate_file_path = PathBuf::from(potential_crate_file.lock().get_absolute_path());
                 // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
-                if self.get_crate(crate_name_from_path(&potential_crate_file_path)).is_some() {
+                if self.get_crate(crate_name_from_path(&potential_crate_file_path)?).is_some() {
                     trace!("  (skipping already-loaded crate {:?})", potential_crate_file_path);
                     continue;
                 }
