@@ -329,6 +329,7 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
                     interrupt_waker: RwLock::new(None),
                 };
 
+                // disable legacy interrupts initially
                 device.pci_enable_interrupts(false);
 
                 device_list.push(device);
@@ -879,7 +880,7 @@ impl PciDevice {
         Ok((int_line, int_pin))
     }
 
-    /// Reads and returns this PCI device's interrupt status flag.
+    /// Enables/Disables legacy (INTx) interrupts for this device
     pub fn pci_enable_interrupts(&self, enable: bool) {
         self.pci_set_interrupt_disable_bit(!enable);
     }
