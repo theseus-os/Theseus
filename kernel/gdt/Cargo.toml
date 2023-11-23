@@ -9,7 +9,7 @@ edition = "2021"
 spin = "0.9.4"
 x86_64 = "0.14.8"
 bit_field = "0.7.0"
-bitflags = "1.1.0"
+bitflags = "2.4.1"
 log = "0.4.8"
 
 [dependencies.atomic_linked_list]

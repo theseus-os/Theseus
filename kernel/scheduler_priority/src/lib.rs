@@ -144,16 +144,16 @@ impl PartialEq for PriorityTaskRef {
 
 impl PartialOrd for PriorityTaskRef {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.priority.cmp(&other.priority) {
-            // Tasks that were ran longer ago should be prioritised.
-            Ordering::Equal => Some(self.last_ran.cmp(&other.last_ran).reverse()),
-            ordering => Some(ordering),
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for PriorityTaskRef {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.priority.cmp(&other.priority)
+        match self.priority.cmp(&other.priority) {
+            // Tasks that were ran longer ago should be prioritised.
+            Ordering::Equal => self.last_ran.cmp(&other.last_ran).reverse(),
+            ordering => ordering,
+        }
     }
 }

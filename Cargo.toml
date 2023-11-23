@@ -34,9 +34,6 @@ exclude = [
 	"build",
 	"target",
 
-	## Exclude the `aarch64` directory, which is a WIP port that currently must be built separately.
-	"aarch64",
-
 	## Exclude configuration, tools, scripts, etc
 	"cfg",
 	"compiler_plugins",
@@ -45,7 +42,6 @@ exclude = [
 
 	## Exclude old components
 	"old_crates",
-	"userspace",
 
 	## Exclude third-party libs and ports for now.
 	## This allows Theseus crates that *are* included in a build to pull these
@@ -73,6 +69,7 @@ exclude = [
 	## Exclude benchmark-related crates in all builds; they must be explicitly included via features.
 	## TODO: move these to a specific "benches" folder so we can exclude that entire folder.
 	"applications/bm",
+	"applications/channel_eval",
 	"applications/heap_eval",
 	"applications/rq_eval",
 	"applications/scheduler_eval",
@@ -80,6 +77,7 @@ exclude = [
 	## Exclude application crates used for testing specific Theseus functionality.
 	## TODO: move these to a specific "tests" folder so we can exclude that entire folder.
 	"applications/test_aligned_page_allocation",
+	"applications/test_async",
 	"applications/test_backtrace",
 	"applications/test_block_io",
 	"applications/test_channel",
@@ -89,13 +87,15 @@ exclude = [
 	"applications/test_libc",
 	"applications/test_mlx5",
 	"applications/test_panic",
+	"applications/test_preemption_counter",
 	"applications/test_restartable",
-	"applications/test_serial_echo",
+	"applications/test_scheduler",
 	"applications/test_std_fs",
 	"applications/test_sync_block",
+	"applications/test_task_cancel",
+	"applications/test_tls",
 	"applications/test_wait_queue",
 	"applications/test_wasmtime",
-	"applications/tls_test",
 	"applications/unwind_test",
 ]
 

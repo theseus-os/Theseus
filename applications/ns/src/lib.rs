@@ -25,7 +25,7 @@ use alloc::{
 use getopts::{Options, Matches};
 use mod_mgmt::CrateNamespace;
 use fs_node::FileRef;
-use path::Path;
+use path::PathBuf;
 
 
 pub fn main(args: Vec<String>) -> isize {
@@ -68,7 +68,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     let mut output = String::new();
 
     if let Some(crate_obj_file_path) = matches.opt_str("load") {
-        let path = Path::new(crate_obj_file_path);
+        let path = PathBuf::from(crate_obj_file_path);
         let file = path.get_file(&curr_wd).ok_or_else(||
             format!("Couldn't resolve path to crate object file at {path:?}")
         )?;

@@ -619,10 +619,10 @@ impl Shell {
         let app_file = matching_apps.next();
         let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
         let app_path = app_file.xor(second_match)
-            .map(|f| Path::new(f.lock().get_absolute_path()))
+            .map(|f| f.lock().get_absolute_path())
             .ok_or(AppErr::NotFound(cmd))?;
 
-        let taskref = spawn::new_application_task_builder(app_path, None)
+        let taskref = spawn::new_application_task_builder(app_path.as_ref(), None)
             .map_err(|e| AppErr::SpawnErr(e.to_string()))?
             .argument(args)
             .block()
@@ -773,7 +773,7 @@ impl Shell {
     /// Try to match the incomplete command against all internal commands. Returns a
     /// vector that contains all matching results.
     fn find_internal_cmd_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
-        let internal_cmds = vec!["fg", "bg", "jobs", "clear"];
+        let internal_cmds = ["fg", "bg", "jobs", "clear"];
         let mut match_cmds = Vec::new();
         for cmd in internal_cmds.iter() {
             if cmd.starts_with(incomplete_cmd) {
@@ -841,7 +841,7 @@ impl Shell {
 
         // Walk through nodes existing in the command.
         for node in &nodes {
-            let path = Path::new(node.to_string());
+            let path: &Path = node.as_ref();
             match path.get(&curr_wd) {
                 Some(file_dir_enum) => {
                     match file_dir_enum {

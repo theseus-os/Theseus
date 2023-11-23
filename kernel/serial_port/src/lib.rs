@@ -20,7 +20,7 @@ extern crate alloc;
 use log::{info, error, warn};
 use alloc::format;
 
-use deferred_interrupt_tasks::{InterruptRegistrationError};
+use deferred_interrupt_tasks::InterruptRegistrationError;
 pub use serial_port_basic::{
     SerialPortAddress,
     SerialPortInterruptEvent,
@@ -95,7 +95,7 @@ pub fn init_serial_port(
         let (int_num, int_handler) = interrupt_number_handler(&serial_port_address);
 
         #[cfg(target_arch = "aarch64")]
-        let (int_num, int_handler) = (PL011_RX_SPI, com1_com3_interrupt_handler);
+        let (int_num, int_handler) = (PL011_RX_SPI, primary_serial_port_interrupt_handler);
 
         SerialPort::register_interrupt_handler(sp.clone(), int_num, int_handler).unwrap();
 
@@ -126,8 +126,8 @@ fn interrupt_number_handler(
 ) -> (InterruptNumber, InterruptHandler) {
     use interrupts::IRQ_BASE_OFFSET;
     match serial_port_address {
-        SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_com3_interrupt_handler),
-        SerialPortAddress::COM2 | SerialPortAddress::COM4 => (IRQ_BASE_OFFSET + 0x03, com2_com4_interrupt_handler),
+        SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, primary_serial_port_interrupt_handler),
+        SerialPortAddress::COM2 | SerialPortAddress::COM4 => (IRQ_BASE_OFFSET + 0x03, secondary_serial_port_interrupt_handler),
     }
 }
 
@@ -383,8 +383,11 @@ static INTERRUPT_ACTION_COM1_COM3: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new();
 
 
-// Cross-platform interrupt handler for COM1 and COM3 (IRQ 0x24 on x86_64).
-interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x4), _stack_frame, {
+// Cross-platform interrupt handler for the primary serial port.
+//
+// * On x86_64, this is IRQ 0x24, used for COM1 and COM3 serial ports.
+// * On aarch64, this is interrupt 0x21, used for the PL011 UART serial port.
+interrupt_handler!(primary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + 0x4, _stack_frame, {
     // log::trace!("COM1/COM3 serial handler");
 
     #[cfg(target_arch = "aarch64")] {
@@ -400,8 +403,8 @@ interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET
     EoiBehaviour::HandlerDidNotSendEoi
 });
 
-// Cross-platform interrupt handler for COM2 and COM4 (IRQ 0x24 on 0x23).
-interrupt_handler!(com2_com4_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x3), _stack_frame, {
+// Cross-platform interrupt handler, only used on x86_64 for COM2 and COM4 (IRQ 0x23).
+interrupt_handler!(secondary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + 0x3, _stack_frame, {
     // trace!("COM2/COM4 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func()

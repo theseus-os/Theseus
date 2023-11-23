@@ -123,7 +123,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
         }
         "apply" | "ap" => {
             let base_dir_path = matches.free.get(1).ok_or_else(|| String::from("missing BASE_DIR path argument"))?;
-            apply(&Path::new(base_dir_path.clone()))
+            apply(base_dir_path.as_ref())
         }
         other => {
             Err(format!("unrecognized command {other:?}"))
@@ -197,8 +197,8 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
         let size = content.len();
         // The name of the crate file that we downloaded is something like: "/keyboard_log/k#keyboard-36be916209949cef.o".
         // We need to get just the basename of the file, then remove the crate type prefix ("k#").
-        let df_path = Path::new(df.name);
-        let cfile = new_namespace_dir.write_crate_object_file(df_path.basename(), content)?;
+        let file_name = Path::new(&df.name).file_name().ok_or("crate file path did not have file name")?;
+        let cfile = new_namespace_dir.write_crate_object_file(file_name, content)?;
         println!("Downloaded crate: {:?}, size {}", cfile.lock().get_absolute_path(), size);
     }
 
@@ -257,7 +257,9 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
             // An empty old_crate_name indicates that there is no old crate or object file to remove, we are just loading a new crate (or inserting its object file)
             None
         } else {
-            let old_crate_name = mod_mgmt::crate_name_from_path(&Path::new(old_crate_module_file_name)).to_string();
+            let old_crate_name = mod_mgmt::crate_name_from_path(old_crate_module_file_name.as_ref())
+                .ok_or("invalid old crate module file name")?
+                .to_string();
             if curr_namespace.get_crate(&old_crate_name).is_none() {
                 println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name());
             }

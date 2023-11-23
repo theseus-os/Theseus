@@ -33,7 +33,7 @@ use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
 use task_struct::ExposedTask;
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
-use path::Path;
+use path::{Path, PathBuf};
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
 use no_drop::NoDrop;
@@ -220,7 +220,7 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 ///    If not provided, the new Task will be spawned within the same namespace as the current task.
 /// 
 pub fn new_application_task_builder(
-    crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
+    crate_object_file: &Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
@@ -229,7 +229,7 @@ pub fn new_application_task_builder(
         .ok_or("spawn::new_application_task_builder(): couldn't get current task")?;
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
-        .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
+        .or_else(|| PathBuf::from(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
     {
         Some(FileOrDir::File(f)) => f,
         _ => return Err("Couldn't find specified file path for new application crate"),
@@ -896,7 +896,7 @@ fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
     // that were lazily initialized during this execution of this task.
     for tls_dtor in thread_local_macro::take_current_tls_destructors().into_iter() {
         unsafe {
-            (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
+            (tls_dtor.dtor)(tls_dtor.object_ptr);
         }
     }
 

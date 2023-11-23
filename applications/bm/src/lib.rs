@@ -35,7 +35,7 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use hpet::get_hpet;
 use heapfile::HeapFile;
-use path::Path;
+use path::{Path, PathBuf};
 use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
 use memory::{create_mapping, PteFlags};
@@ -324,9 +324,9 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, on_cpu: CpuId) -> Resu
 		.map_err(|_| "could not find the application namespace")?;
 	let namespace_dir = namespace.dir();
 	let app_path = namespace_dir.get_file_starting_with("hello-")
-		.map(|f| Path::new(f.lock().get_absolute_path()))
+		.map(|f| PathBuf::from(f.lock().get_absolute_path()))
 		.ok_or("Could not find the application 'hello'")?;
-	let crate_name = crate_name_from_path(&app_path).to_string();
+	let crate_name = crate_name_from_path(&app_path).ok_or("invalid app path")?.to_string();
 
 	// here we are taking the time at every iteration. 
 	// otherwise the crate is not fully unloaded from the namespace before the next iteration starts 
@@ -336,7 +336,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, on_cpu: CpuId) -> Resu
 		while namespace.get_crate(&crate_name).is_some() {  }
 
 		start_hpet = hpet.get_counter();
-		let child = spawn::new_application_task_builder(app_path.clone(), None)?
+		let child = spawn::new_application_task_builder(&app_path, None)?
 			.pin_on_cpu(on_cpu)
 	        .spawn()?;
 
@@ -1237,7 +1237,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 
-	let path = Path::new(filename.to_string());
+	let path = PathBuf::from(filename.to_string());
 	let mut _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
 	let size = match get_file(filename) {
@@ -1302,7 +1302,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 
-	let path = Path::new(filename.to_string());
+	let path = PathBuf::from(filename.to_string());
 	let _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
 	let size = match get_file(filename) {
@@ -1640,7 +1640,7 @@ fn test_file_inner(fileref: FileRef) {
 /// Wrapper function to get a file provided a string.
 /// Not used in measurements
 fn get_file(filename: &str) -> Option<FileRef> {
-	let path = Path::new(filename.to_string());
+	let path: &Path = filename.as_ref();
 	match path.get(&get_cwd().unwrap()) {
 		Some(file_dir_enum) => {
 			match file_dir_enum {

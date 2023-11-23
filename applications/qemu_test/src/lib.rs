@@ -9,9 +9,9 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 
 use app_io::{print, println};
-use path::Path;
 use qemu_exit::{QEMUExit, X86};
 use task::{ExitValue, KillReason};
+use path::{Path, PathBuf};
 
 extern crate alloc;
 
@@ -37,7 +37,7 @@ pub fn main(_: Vec<String>) -> isize {
                 // deadlock.
                 let file = dir.lock().get_file(file_name.as_ref()).unwrap();
                 let path = file.lock().get_absolute_path();
-                Some((file_name, Path::new(path)))
+                Some((file_name, PathBuf::from(path)))
             } else {
                 None
             }
@@ -56,7 +56,7 @@ pub fn main(_: Vec<String>) -> isize {
             num_ignored += 1;
             println!("ignored");
         } else {
-            match run_test(path) {
+            match run_test(&path) {
                 Ok(_) => println!("ok"),
                 Err(_) => {
                     num_failed += 1;
@@ -81,7 +81,7 @@ pub fn main(_: Vec<String>) -> isize {
 }
 
 #[allow(clippy::result_unit_err)]
-pub fn run_test(path: Path) -> Result<(), ()> {
+pub fn run_test(path: &Path) -> Result<(), ()> {
     match spawn::new_application_task_builder(path, None)
         .unwrap()
         .argument(Vec::new())

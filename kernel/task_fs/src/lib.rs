@@ -42,7 +42,7 @@ use alloc::sync::Arc;
 use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 use memory::MappedPages;
 use task::WeakTaskRef;
-use path::Path;
+use path::{Path, PathBuf};
 use io::{ByteReader, ByteWriter, KnownLength, IoError};
 
 
@@ -146,7 +146,7 @@ pub struct TaskDir {
     /// The name of the directory
     pub name: String,
     /// The absolute path of the TaskDir
-    path: Path,
+    path: PathBuf,
     task_id: usize,
     taskref: WeakTaskRef,
     /// We can store the parent (TaskFs) because it is a persistent directory
@@ -163,7 +163,7 @@ impl TaskDir {
     ) -> Result<TaskDir, &'static str> {
         let directory = TaskDir {
             name,
-            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}")),
+            path: PathBuf::from(format!("{TASKS_DIRECTORY_PATH}/{task_id}")),
             task_id,
             taskref,
             parent: Arc::clone(parent),
@@ -227,7 +227,7 @@ impl FsNode for TaskDir {
 pub struct TaskFile {
     taskref: WeakTaskRef,
     task_id: usize,
-    path: Path, 
+    path: PathBuf, 
 }
 
 impl TaskFile {
@@ -235,7 +235,7 @@ impl TaskFile {
         TaskFile {
             taskref,
             task_id,
-            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/task_info")), 
+            path: PathBuf::from(format!("{TASKS_DIRECTORY_PATH}/{task_id}/task_info")), 
         }
     }
 
@@ -280,7 +280,7 @@ impl FsNode for TaskFile {
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
-        let path = Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, self.task_id));
+        let path = PathBuf::from(format!("{}/{}", TASKS_DIRECTORY_PATH, self.task_id));
         match Path::get_absolute(&path) {
             Some(FileOrDir::Dir(d)) => Some(d),
             _ => None,
@@ -333,7 +333,7 @@ impl File for TaskFile {
 pub struct MmiDir {
     taskref: WeakTaskRef,
     task_id: usize,
-    path: Path, 
+    path: PathBuf, 
 }
 
 impl MmiDir {
@@ -342,7 +342,7 @@ impl MmiDir {
         MmiDir {
             taskref,
             task_id,
-            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi")),
+            path: PathBuf::from(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi")),
         }
     }
 }
@@ -383,7 +383,7 @@ impl FsNode for MmiDir {
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
-        let path = Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, self.task_id));
+        let path = PathBuf::from(format!("{}/{}", TASKS_DIRECTORY_PATH, self.task_id));
         match Path::get_absolute(&path) {
             Some(FileOrDir::Dir(d)) => Some(d),
             _ => None,
@@ -402,7 +402,7 @@ impl FsNode for MmiDir {
 pub struct MmiFile {
     taskref: WeakTaskRef,
     task_id: usize,
-    path: Path, 
+    path: PathBuf, 
 }
 
 impl MmiFile {
@@ -410,7 +410,7 @@ impl MmiFile {
         MmiFile {
             taskref,
             task_id,
-            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi/MmiInfo")), 
+            path: PathBuf::from(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi/MmiInfo")), 
         }
     }
 
@@ -434,7 +434,7 @@ impl FsNode for MmiFile {
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
-        let path = Path::new(format!("{}/{}/mmi", TASKS_DIRECTORY_PATH, self.task_id));
+        let path = PathBuf::from(format!("{}/{}/mmi", TASKS_DIRECTORY_PATH, self.task_id));
         match Path::get_absolute(&path) {
             Some(FileOrDir::Dir(d)) => Some(d),
             _ => None,

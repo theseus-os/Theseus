@@ -12,6 +12,7 @@
 
 #![no_std]
 #![feature(ptr_internals)]
+#![feature(more_qualified_paths)]
 
 extern crate alloc;
 

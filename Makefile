@@ -8,6 +8,12 @@ SHELL := /bin/bash
 ## Cargo already handles build parallelism for us anyway.
 .NOTPARALLEL:
 
+## Override the locale as building on non-English systems may fail.
+## Or even worse: it might build, but not boot.
+## Overriding LC_ALL instead throws bash warnings.
+## C.UTF-8 should be available on all modern glibc systems.
+export override LANG="C.UTF-8"
+
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 

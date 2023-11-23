@@ -39,7 +39,7 @@ use hashbrown::HashMap;
 use job::Job;
 use log::{error, warn};
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
-use path::Path;
+use path::PathBuf;
 use stdio::Stdio;
 use sync_block::Mutex;
 use task::{ExitValue, KillReason};
@@ -306,7 +306,7 @@ impl Shell {
             .into_iter();
 
         let app_path = match matching_files.next() {
-            Some(f) => Path::new(f.lock().get_absolute_path()),
+            Some(f) => PathBuf::from(f.lock().get_absolute_path()),
             None => return Err(Error::CommandNotFound(cmd.to_owned())),
         };
 
@@ -314,7 +314,7 @@ impl Shell {
             println!("multiple matching files found, running: {app_path}");
         }
 
-        let task = spawn::new_application_task_builder(app_path, None)
+        let task = spawn::new_application_task_builder(&app_path, None)
             .map_err(Error::SpawnFailed)?
             .argument(args.into_iter().map(ToOwned::to_owned).collect::<Vec<_>>())
             .block()

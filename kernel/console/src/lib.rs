@@ -116,8 +116,8 @@ fn shell_loop(
         mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
             .expect("Couldn't find hull in default app namespace");
 
-    let path = path::Path::new(app_file.lock().get_absolute_path());
-    let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
+    let path = app_file.lock().get_absolute_path();
+    let task = spawn::new_application_task_builder(path.as_ref(), Some(new_app_ns))?
         .name(format!("{address:?}_hull"))
         .block()
         .spawn()?;

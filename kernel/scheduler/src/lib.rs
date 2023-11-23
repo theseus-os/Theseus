@@ -41,16 +41,16 @@ pub fn init() -> Result<(), &'static str> {
     }
 
     #[cfg(target_arch = "aarch64")] {
-        interrupts::init_timer(timer_tick_handler)?;
-        interrupts::enable_timer(true);
+        interrupts::setup_timer_interrupt(timer_tick_handler)?;
+        generic_timer_aarch64::enable_timer_interrupt(true);
         Ok(())
     }
 }
 
 // Architecture-independent timer interrupt handler for preemptive scheduling.
-interrupt_handler!(timer_tick_handler, None, _stack_frame, {
+interrupt_handler!(timer_tick_handler, _, _stack_frame, {
     #[cfg(target_arch = "aarch64")]
-    interrupts::schedule_next_timer_tick();
+    generic_timer_aarch64::set_next_timer_interrupt(get_timeslice_ticks());
 
     // tick count, only used for debugging
     if false {
@@ -64,17 +64,29 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
     // in order to unblock any tasks that are done sleeping.
     sleep::unblock_sleeping_tasks();
 
-    // We must acknowledge the interrupt before the end of this handler
+    // We must acknowledge the interrupt *before* the end of this handler
     // because we switch tasks here, which doesn't return.
-    {
-        #[cfg(target_arch = "x86_64")]
-        eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
-
-        #[cfg(target_arch = "aarch64")]
-        eoi(CPU_LOCAL_TIMER_IRQ);
-    }
+    eoi(CPU_LOCAL_TIMER_IRQ);
 
     schedule();
 
     EoiBehaviour::HandlerSentEoi
 });
+
+
+/// Returns the (cached) number of system timer ticks needed for the scheduling timeslice interval.
+///
+/// This is only needed on aarch64 because it only effectively offers a one-shot timer;
+/// x86_64 can be configured once as a recurring periodic timer.
+#[cfg(target_arch = "aarch64")]
+fn get_timeslice_ticks() -> u64 {
+    use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
+
+    static TIMESLICE_TICKS: spin::Once<u64> = spin::Once::new();
+
+    *TIMESLICE_TICKS.call_once(|| {
+        let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
+        let tick_period_femtosecs = generic_timer_aarch64::timer_period_femtoseconds();
+        timeslice_femtosecs / tick_period_femtosecs
+    })
+}

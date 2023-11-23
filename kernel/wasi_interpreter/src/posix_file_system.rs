@@ -8,12 +8,11 @@
 //!
 
 use alloc::string::String;
-use alloc::vec::Vec;
 use core::{cmp, convert::TryFrom as _};
 use fs_node::{DirRef, FileOrDir, FileRef, FsNode};
 use hashbrown::HashMap;
 use memfs::MemFile;
-use path::Path;
+use path::{PathBuf, Path};
 
 const FIRST_NONRESERVED_FD: wasi::Fd = 3;
 
@@ -146,12 +145,12 @@ impl PosixNode {
     /// # Return
     /// Returns relative path of file descriptor as a string.
     pub fn get_relative_path(&self) -> String {
-        let absolute_path = Path::new(self.theseus_file_or_dir.get_absolute_path());
+        let absolute_path = PathBuf::from(self.theseus_file_or_dir.get_absolute_path());
         let wd_path = task::with_current_task(|t|
-            Path::new(t.get_env().lock().cwd())
+            PathBuf::from(t.get_env().lock().cwd())
         ).expect("couldn't get current task");
 
-        let relative_path: Path = absolute_path.relative(&wd_path).unwrap();
+        let relative_path = absolute_path.relative(wd_path).unwrap();
         String::from(relative_path)
     }
 
@@ -381,12 +380,10 @@ impl FileDescriptorTable {
         }
 
         // Split path into parent directory path and base path.
-        let file_path: Path = Path::new(String::from(path));
-        let mut file_path_tokens: Vec<&str> = file_path.components().collect();
-        file_path_tokens.truncate(file_path_tokens.len().saturating_sub(1));
-        let parent_dir_path: Path = Path::new(file_path_tokens.join("/"));
-        let base_name: &str = file_path.basename();
-        let base_path: Path = Path::new(String::from(base_name));
+        let file_path: &Path = path.as_ref();
+        let parent_dir_path = file_path.parent().ok_or(wasi::ERRNO_NOENT)?;
+        let base_name = file_path.file_name().ok_or(wasi::ERRNO_NOENT)?;
+        let base_path: &Path = base_name.as_ref();
 
         // Get parent directory.
         let parent_dir: DirRef = match parent_dir_path.get(&starting_dir) {

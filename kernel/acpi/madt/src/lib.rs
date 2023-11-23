@@ -355,7 +355,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
 
             // Redirect every IoApic's interrupts to the one BSP.
             // TODO: long-term, we should distribute interrupts across CPUs more evenly.
-            for (_ioapic_id, ioapic) in ioapic::get_ioapics().iter() {
+            for (_ioapic_id, ioapic) in ioapic::get_ioapics() {
                 let mut ioapic_ref = ioapic.lock();
 
                 // Set the BSP to receive regular PIC interrupts routed through the IoApic.
@@ -380,7 +380,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
             let mut handled = false;
 
             // find the IoApic that should handle this interrupt source override entry
-            for (_id, ioapic) in ioapic::get_ioapics().iter() {
+            for (_id, ioapic) in ioapic::get_ioapics() {
                 let mut ioapic_ref = ioapic.lock();
                 if ioapic_ref.handles_irq(int_src.gsi) {
                     // using BSP for now, but later we could redirect the IRQ to more (or all) cores
