@@ -2,7 +2,7 @@
 ### that is sufficient to build Theseus and run it using QEMU.
 
 
-FROM ubuntu:18.04
+FROM ubuntu:22.04
 LABEL author=kevinaboos@gmail.com
 
 
@@ -30,7 +30,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-ins
 RUN apt-get install -y build-essential curl git
 
 # Install Theseus's build dependencies
-RUN apt-get install -y make gcc nasm pkg-config grub-pc-bin mtools xorriso wget
+RUN apt-get install -y make gcc nasm pkg-config grub-common mtools xorriso wget
 # Install QEMU and KVM, based on <https://help.ubuntu.com/community/KVM/Installation>
 RUN apt-get install -y qemu qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
 
