@@ -24,9 +24,6 @@ path = "../memory"
 [dependencies.task]
 path = "../task"
 
-[dependencies.runqueue]
-path = "../runqueue"
-
 [dependencies.hpet]
 path = "../acpi/hpet"
 

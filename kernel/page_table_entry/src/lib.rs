@@ -13,7 +13,7 @@
 #![no_std]
 
 use core::ops::Deref;
-use memory_structs::{Frame, FrameRange, PhysicalAddress};
+use memory_structs::{Frame, FrameRange, PhysicalAddress, PageSize};
 use zerocopy::FromBytes;
 use frame_allocator::AllocatedFrame;
 use pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
@@ -126,7 +126,7 @@ impl PageTableEntry {
     /// This is the actual mapping action that informs the MMU of a new mapping.
     ///
     /// Note: this performs no checks about the current value of this page table entry.
-    pub fn set_entry(&mut self, frame: AllocatedFrame, flags: PteFlagsArch) {
+    pub fn set_entry<P: PageSize>(&mut self, frame: AllocatedFrame<P>, flags: PteFlagsArch) {
         self.0 = (frame.start_address().value() as u64) | flags.bits();
     }
 

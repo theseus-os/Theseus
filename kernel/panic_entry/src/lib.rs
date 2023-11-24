@@ -6,6 +6,7 @@
 
 #![no_std]
 #![feature(alloc_error_handler)]
+#![allow(internal_features)]
 #![feature(lang_items)]
 #![feature(panic_info_message)]
 

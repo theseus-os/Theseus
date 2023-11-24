@@ -22,6 +22,7 @@ bitflags! {
     /// * Bits `[52:62]` (inclusive) are available for custom OS usage.
     /// * Bit  `63` is reserved by hardware for access flags (noexec).
     #[doc(cfg(target_arch = "x86_64"))]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct PteFlagsX86_64: u64 {
         /// * If set, this page is currently "present" in memory. 
         /// * If not set, this page is not in memory, which could mean one of several things:
@@ -49,7 +50,7 @@ bitflags! {
         /// that index is used to determine the PAT entry that holds the
         /// memory caching type that is applied to this page.
         const WRITE_THROUGH      = 1 << 3;
-        const PAT_BIT0           = Self::WRITE_THROUGH.bits;
+        const PAT_BIT0           = Self::WRITE_THROUGH.bits();
 
         /// * If set, this page's content is never cached, neither for read nor writes. 
         /// * If not set, this page's content is cached as normal, both for read nor writes. 
@@ -60,8 +61,8 @@ bitflags! {
         /// memory caching type that is applied to this page.
         const CACHE_DISABLE      = 1 << 4;
         /// An alias for [`Self::CACHE_DISABLE`] in order to ease compatibility with aarch64.
-        const DEVICE_MEMORY      = Self::CACHE_DISABLE.bits;
-        const PAT_BIT1           = Self::CACHE_DISABLE.bits;
+        const DEVICE_MEMORY      = Self::CACHE_DISABLE.bits();
+        const PAT_BIT1           = Self::CACHE_DISABLE.bits();
 
         /// * The hardware will set this bit when the page is accessed.
         /// * The OS can then clear this bit once it has acknowledged that the page was accessed,

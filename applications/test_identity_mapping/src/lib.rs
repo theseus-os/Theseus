@@ -26,13 +26,9 @@ fn rmain() -> Result<(), &'static str> {
     let flags = memory::PteFlags::new().valid(true);
     for num_pages in TEST_SET.into_iter() {
         println!("Attempting to create identity mapping of {num_pages} pages...");
-        match memory::create_identity_mapping(num_pages, flags) {
-            Ok(mp) => {
-                assert_eq!(mp.size_in_pages(), num_pages);
-                println!("    Success: {mp:?}");
-            }
-            Err(e) => println!("    !! FAILURE: {e:?}"),
-        }
+        let mp = memory::create_identity_mapping(num_pages, flags)?;
+        assert_eq!(mp.size_in_pages(), num_pages);
+        println!("    Success: {mp:?}");
     }
     
     Ok(())

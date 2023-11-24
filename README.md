@@ -1,9 +1,14 @@
 # Theseus OS
 
-[![Documentation Action](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/docs.yaml?label=docs%20build)](https://github.com/theseus-os/Theseus/actions/workflows/docs.yaml)
 [![Documentation](https://img.shields.io/badge/view-docs-blue)](https://theseus-os.github.io/Theseus/doc/___Theseus_Crates___/index.html)
 [![Book](https://img.shields.io/badge/view-book-blueviolet)](https://theseus-os.github.io/Theseus/book/index.html)
 [![Blog](https://img.shields.io/badge/view-blog-orange)](https://theseus-os.com)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=flat&logo=discord&logoColor=white)](https://discord.gg/NuUnqeYT8R)
+<br>
+[![Build Action](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/docs.yaml?label=build)](https://github.com/theseus-os/Theseus/actions/workflows/docs.yaml)
+[![Clippy Action](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/check-clippy.yaml?label=clippy)](https://github.com/theseus-os/Theseus/actions/workflows/check-clippy.yaml)
+[![QEMU tests](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/test.yaml?label=QEMU%20tests)](https://github.com/theseus-os/Theseus/actions/workflows/test.yaml)
+
 
 Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
@@ -99,8 +104,10 @@ If you're on WSL, also do the following steps:
     ```sh
     rm -rf /tmp/theseus_tools_src
     ```
-
-  * If you're building Theseus on an M1-based Mac, you may need to use `gmake` instead of `make` for build commands. Alternatively, you can use `bash` with x86 emulation, but this is generally not necessary. 
+  * **NOTE**: on MacOS, you need to run `gmake` instead of `make` for build commands (or you can simply create a shell alias).
+    * This is because HomeBrew installs its binaries in a way that doesn't conflict with built-in versions of system utilities.
+  
+  * *(This is typically not necessary)*: if you're building Theseus on older Apple Silicon (M1 chips), you may need to use `bash` with x86 emulation:
     ```sh
     arch -x86_64 bash   # or another shell of your choice
     ```
@@ -239,7 +246,7 @@ make view-book  ## for the Theseus book
 We have tested Theseus on a variety of real machines, including Intel NUC devices, various Thinkpad laptops, and Supermicro servers. 
 Currently, we have only tested booting Theseus via USB or PXE using a traditional BIOS bootloader rather than UEFI, but UEFI is fully supported so it should work.
 
-To boot over USB, simply run `make boot usb=sdc`, in which `sdc` is the device node for the USB disk itself *(**not a partition** like sdc2)* to which you want to write the OS image.
+To boot over USB, simply run `make usb drive=sdc`, in which `sdc` is the device node for the USB disk itself *(**not a partition** like sdc2)* to which you want to write the OS image.
 On WSL or other host environments where `/dev` device nodes don't exist, you can simply run `make iso` and burn the `.iso` file in the `build/` directory to a USB, e.g., using [Rufus](https://rufus.ie/) on Windows.
 
 To boot Theseus over PXE (network boot), see [this set of separate instructions](https://theseus-os.github.io/Theseus/book/running/pxe.html).

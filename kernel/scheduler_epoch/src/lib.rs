@@ -1,181 +1,223 @@
-//! This crate picks the next task on token based scheduling policy.
-//! At the begining of each scheduling epoch a set of tokens is distributed
-//! among tasks depending on their priority.
-//! [tokens assigned to each task = (prioirty of each task / prioirty of all
-//! tasks) * length of epoch]. Each time a task is picked, the token count of
-//! the task is decremented by 1. A task is executed only if it has tokens
-//! remaining. When all tokens of all runnable task are exhausted a new
-//! scheduling epoch is initiated. In addition this crate offers the interfaces
-//! to set and get priorities  of each task.
+//! This crate implements a token-based epoch scheduling policy.
+//!
+//! At the begining of each scheduling epoch, a set of tokens is distributed
+//! among all runnable tasks, based on their priority relative to all other
+//! runnable tasks in the runqueue. The formula for this is:
+//! ```ignore
+//! tokens_assigned_to_task_i = (priority_task_i / sum_priority_all_tasks) * epoch_length;
+//! ```
+//! * Each time a task is picked, its token count is decremented by 1.
+//! * A task can only be selected for next execution if it has tokens remaining.
+//! * When all tokens of all runnable task are exhausted, a new scheduling epoch begins.
+//!
+//! This epoch scheduler is also a priority-based scheduler, so it allows
+//! getting and setting the priorities of each task.
 
 #![no_std]
 
 extern crate alloc;
 
-use log::error;
-use runqueue_epoch::{RunQueue, MAX_PRIORITY};
+use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
+use core::ops::{Deref, DerefMut};
 use task::TaskRef;
 
-pub use runqueue_epoch::{inherit_priority, PriorityInheritanceGuard};
+const MAX_PRIORITY: u8 = 40;
+const DEFAULT_PRIORITY: u8 = 20;
+const INITIAL_TOKENS: usize = 10;
 
-/// A data structure to transfer data from select_next_task_priority
-/// to select_next_task
-struct NextTaskResult {
-    taskref: Option<TaskRef>,
-    idle_task: bool,
+/// An instance of an epoch scheduler, typically one per CPU.
+pub struct Scheduler {
+    idle_task: TaskRef,
+    queue: VecDeque<EpochTaskRef>,
 }
 
-/// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum
-/// prriority).
-pub fn set_priority(task: &TaskRef, priority: u8) {
-    let priority = core::cmp::min(priority, MAX_PRIORITY);
-    runqueue_epoch::set_priority(task, priority);
-}
-
-/// Returns the priority of the given task.
-pub fn get_priority(task: &TaskRef) -> Option<u8> {
-    runqueue_epoch::get_priority(task)
-}
-
-/// This defines the priority scheduler policy.
-/// Returns None if there is no schedule-able task.
-pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
-    let next_task = select_next_task_priority(apic_id)?;
-    // If the selected task is idle task we begin a new scheduling epoch
-    if next_task.idle_task {
-        assign_tokens(apic_id);
-        select_next_task_priority(apic_id)?.taskref
-    } else {
-        next_task.taskref
-    }
-}
-
-/// this defines the priority scheduler policy.
-/// Returns None if there is no runqueue
-/// Otherwise returns a task with a flag indicating whether its an idle task.
-fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult> {
-    let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
-        Some(rq) => rq.write(),
-        _ => {
-            // #[cfg(not(loscd_eval))]
-            // error!("BUG: select_next_task_priority(): couldn't get runqueue for core {}",
-            // apic_id);
-            return None;
+impl Scheduler {
+    /// Creates a new epoch scheduler instance with the given idle task.
+    pub const fn new(idle_task: TaskRef) -> Self {
+        Self {
+            idle_task,
+            queue: VecDeque::new(),
         }
-    };
+    }
 
-    if let Some((task_index, _)) = runqueue_locked
-        .iter()
-        .enumerate()
-        .find(|(_, task)| task.is_runnable())
-    {
-        let modified_tokens = {
-            let chosen_task = runqueue_locked.get(task_index);
-            match chosen_task.map(|m| m.tokens_remaining) {
-                Some(x) => x.saturating_sub(1),
-                None => 0,
+    /// Moves the `TaskRef` at the given `index` in this scheduler's runqueue
+    /// to the end (back) of the runqueue.
+    ///
+    /// Sets the number of tokens for that task to the given `tokens`
+    /// and increments that task's number of context switches.
+    ///
+    /// Returns a cloned reference to the `TaskRef` at the given `index`.
+    fn update_and_move_to_end(&mut self, index: usize, tokens: usize) -> Option<TaskRef> {
+        if let Some(mut priority_task_ref) = self.queue.remove(index) {
+            priority_task_ref.tokens_remaining = tokens;
+            let task_ref = priority_task_ref.task.clone();
+            self.queue.push_back(priority_task_ref);
+            Some(task_ref)
+        } else {
+            None
+        }
+    }
+
+    fn try_next(&mut self) -> Option<TaskRef> {
+        if let Some((task_index, _)) = self
+            .queue
+            .iter()
+            .enumerate()
+            .find(|(_, task)| task.is_runnable() && task.tokens_remaining > 0)
+        {
+            let chosen_task = self.queue.get(task_index).unwrap();
+            let modified_tokens = chosen_task.tokens_remaining.saturating_sub(1);
+            self.update_and_move_to_end(task_index, modified_tokens)
+        } else {
+            None
+        }
+    }
+
+    fn assign_tokens(&mut self) {
+        // We begin with total priorities = 1 to avoid division by zero
+        let mut total_priorities: usize = 1;
+
+        // This loop calculates the total priorities of the runqueue
+        for (_i, t) in self.queue.iter().enumerate() {
+            // we assign tokens only to runnable tasks
+            if !t.is_runnable() {
+                continue;
             }
-        };
 
-        let task = runqueue_locked.update_and_move_to_end(task_index, modified_tokens);
+            total_priorities = total_priorities
+                .saturating_add(1)
+                .saturating_add(t.priority as usize);
+        }
 
-        Some(NextTaskResult {
-            taskref: task,
-            idle_task: false,
-        })
-    } else {
-        Some(NextTaskResult {
-            taskref: Some(runqueue_locked.idle_task().clone()),
-            idle_task: true,
-        })
+        // Each epoch lasts for a total of 100 tokens by default.
+        // However, as this granularity could skip over low priority tasks
+        // when many concurrent tasks are running, we increase the epoch in such cases.
+        let epoch: usize = core::cmp::max(total_priorities, 100);
+
+        for (_i, t) in self.queue.iter_mut().enumerate() {
+            // we give zero tokens to the idle tasks
+            if t.is_an_idle_task {
+                continue;
+            }
+
+            // we give zero tokens to non-runnable tasks
+            if !t.is_runnable() {
+                continue;
+            }
+
+            // task_tokens = epoch * (taskref + 1) / total_priorities;
+            let task_tokens = epoch
+                .saturating_mul((t.priority as usize).saturating_add(1))
+                .wrapping_div(total_priorities);
+
+            t.tokens_remaining = task_tokens;
+            // debug!("assign_tokens(): CPU {} chose Task {:?}", cpu_id, &*t);
+        }
     }
 }
 
-/// This assigns tokens between tasks.
-/// Returns true if successful.
-/// Tokens are assigned based on  (prioirty of each task / prioirty of all
-/// tasks).
-fn assign_tokens(apic_id: u8) -> bool {
-    let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
-        Some(rq) => rq.write(),
-        _ => {
-            // #[cfg(not(loscd_eval))]
-            // error!("BUG: assign_tokens(): couldn't get runqueue for core {}", apic_id);
-            return false;
-        }
-    };
-
-    // We begin with total priorities = 1 to avoid division by zero
-    let mut total_priorities: usize = 1;
-
-    // This loop calculates the total priorities of the runqueue
-    for (_i, t) in runqueue_locked.iter().enumerate() {
-        // we skip the idle task, it contains zero tokens as it is picked last
-        if t.is_an_idle_task {
-            continue;
-        }
-
-        // we assign tokens only to runnable tasks
-        if !t.is_runnable() {
-            continue;
-        }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_cpu() {
-            if pinned.into_u8() != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!(
-                    "select_next_task() (AP {}) found a task pinned to a different core: {:?}",
-                    apic_id, t
-                );
-                return false;
-            }
-        }
-
-        total_priorities = total_priorities
-            .saturating_add(1)
-            .saturating_add(t.priority as usize);
+impl task::scheduler::Scheduler for Scheduler {
+    fn next(&mut self) -> TaskRef {
+        self.try_next()
+            .or_else(|| {
+                self.assign_tokens();
+                self.try_next()
+            })
+            .unwrap_or_else(|| self.idle_task.clone())
     }
 
-    // We keep each epoch for 100 tokens by default
-    // However since this granularity could miss low priority tasks when
-    // many concurrent tasks are running, we increase the epoch in such cases
-    let epoch: usize = core::cmp::max(total_priorities, 100);
+    fn add(&mut self, task: TaskRef) {
+        let priority_task_ref = EpochTaskRef::new(task);
+        self.queue.push_back(priority_task_ref);
+    }
 
-    // We iterate through each task in runqueue
-    // We dont use iterator as items are modified in the process
-    for (_i, t) in runqueue_locked.iter_mut().enumerate() {
-        // we give zero tokens to the idle tasks
-        if t.is_an_idle_task {
-            continue;
-        }
+    fn busyness(&self) -> usize {
+        self.queue.len()
+    }
 
-        // we give zero tokens to none runnable tasks
-        if !t.is_runnable() {
-            continue;
-        }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_cpu() {
-            if pinned.into_u8() != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!(
-                    "select_next_task() (AP {}) found a task pinned to a different core: {:?}",
-                    apic_id, &*t
-                );
-                return false;
+    fn remove(&mut self, task: &TaskRef) -> bool {
+        let mut task_index = None;
+        for (i, t) in self.queue.iter().enumerate() {
+            if **t == *task {
+                task_index = Some(i);
+                break;
             }
         }
-        // task_tokens = epoch * (taskref + 1) / total_priorities;
-        let task_tokens = epoch
-            .saturating_mul((t.priority as usize).saturating_add(1))
-            .wrapping_div(total_priorities);
 
-        t.tokens_remaining = task_tokens;
-        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, &*t);
-        // break;
+        if let Some(task_index) = task_index {
+            self.queue.remove(task_index);
+            true
+        } else {
+            false
+        }
     }
 
-    true
+    fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler::PriorityScheduler> {
+        Some(self)
+    }
+
+    fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_> {
+        Box::new(self.queue.drain(..).map(|epoch_task| epoch_task.task))
+    }
+
+    fn tasks(&self) -> Vec<TaskRef> {
+        self.queue
+            .clone()
+            .into_iter()
+            .map(|epoch_task| epoch_task.task)
+            .collect()
+    }
+}
+
+impl task::scheduler::PriorityScheduler for Scheduler {
+    fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+        let priority = core::cmp::min(priority, MAX_PRIORITY);
+        for epoch_task in self.queue.iter_mut() {
+            if epoch_task.task == *task {
+                epoch_task.priority = priority;
+                return true;
+            }
+        }
+        false
+    }
+
+    fn priority(&mut self, task: &TaskRef) -> Option<u8> {
+        for epoch_task in self.queue.iter() {
+            if epoch_task.task == *task {
+                return Some(epoch_task.priority);
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug, Clone)]
+struct EpochTaskRef {
+    task: TaskRef,
+    priority: u8,
+    tokens_remaining: usize,
+}
+
+impl Deref for EpochTaskRef {
+    type Target = TaskRef;
+
+    fn deref(&self) -> &TaskRef {
+        &self.task
+    }
+}
+
+impl DerefMut for EpochTaskRef {
+    fn deref_mut(&mut self) -> &mut TaskRef {
+        &mut self.task
+    }
+}
+
+impl EpochTaskRef {
+    fn new(task: TaskRef) -> EpochTaskRef {
+        EpochTaskRef {
+            task,
+            priority: DEFAULT_PRIORITY,
+            tokens_remaining: INITIAL_TOKENS,
+        }
+    }
 }

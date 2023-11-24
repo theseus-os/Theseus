@@ -89,7 +89,7 @@ unsafe impl GlobalAlloc for Heap {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if (ptr as usize) < INITIAL_HEAP_END_ADDR {
+        if KERNEL_HEAP_START <= (ptr as usize) && (ptr as usize) < INITIAL_HEAP_END_ADDR {
             self.initial_allocator.lock().deallocate(ptr, layout);
         }
         else {

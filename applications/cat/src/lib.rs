@@ -11,7 +11,7 @@ extern crate core2;
 
 use core::str;
 use alloc::{
-    string::{String, ToString},
+    string::String,
     vec::Vec,
 };
 use getopts::Options;
@@ -47,7 +47,7 @@ pub fn main(args: Vec<String>) -> isize {
         println!("failed to get current task");
         return -1;
     };
-    let path = Path::new(matches.free[0].to_string());
+    let path: &Path = matches.free[0].as_ref();
     
     // navigate to the filepath specified by first argument
     match path.get(&cwd) {

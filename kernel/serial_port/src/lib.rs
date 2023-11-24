@@ -20,7 +20,7 @@ extern crate alloc;
 use log::{info, error, warn};
 use alloc::format;
 
-use deferred_interrupt_tasks::{InterruptRegistrationError};
+use deferred_interrupt_tasks::InterruptRegistrationError;
 pub use serial_port_basic::{
     SerialPortAddress,
     SerialPortInterruptEvent,
@@ -82,6 +82,8 @@ pub fn init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
 ) -> Option<&'static Arc<IrqSafeMutex<SerialPort>>> {
+    // Note: if we're called by device_manager, we cannot log (as we're modifying the logger config)
+
     #[cfg(target_arch = "aarch64")]
     if serial_port_address != SerialPortAddress::COM1 {
         return None;
@@ -94,7 +96,7 @@ pub fn init_serial_port(
         let (int_num, int_handler) = interrupt_number_handler(&serial_port_address);
 
         #[cfg(target_arch = "aarch64")]
-        let (int_num, int_handler) = (PL011_RX_SPI, com1_com3_interrupt_handler);
+        let (int_num, int_handler) = (PL011_RX_SPI, primary_serial_port_interrupt_handler);
 
         SerialPort::register_interrupt_handler(sp.clone(), int_num, int_handler).unwrap();
 
@@ -125,8 +127,8 @@ fn interrupt_number_handler(
 ) -> (InterruptNumber, InterruptHandler) {
     use interrupts::IRQ_BASE_OFFSET;
     match serial_port_address {
-        SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_com3_interrupt_handler),
-        SerialPortAddress::COM2 | SerialPortAddress::COM4 => (IRQ_BASE_OFFSET + 0x03, com2_com4_interrupt_handler),
+        SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, primary_serial_port_interrupt_handler),
+        SerialPortAddress::COM2 | SerialPortAddress::COM4 => (IRQ_BASE_OFFSET + 0x03, secondary_serial_port_interrupt_handler),
     }
 }
 
@@ -309,7 +311,7 @@ fn serial_port_receive_deferred(
     let mut buf = DataChunk::empty();
     let bytes_read;
     let base_port;
-    
+
     let mut input_was_ignored = false;
     let mut send_result = Ok(());
 
@@ -331,9 +333,6 @@ fn serial_port_receive_deferred(
             // other than data being received, which is the only one we currently care about.
             return Ok(());
         }
-
-        #[cfg(target_arch = "aarch64")]
-        sp.enable_interrupt(SerialPortInterruptEvent::DataReceived, true);
     }
 
     if let Err(e) = send_result {
@@ -385,22 +384,28 @@ static INTERRUPT_ACTION_COM1_COM3: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new();
 
 
-// Cross-platform interrupt handler for COM1 and COM3 (IRQ 0x24 on x86_64).
-interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x4), _stack_frame, {
-    // trace!("COM1/COM3 serial handler");
+// Cross-platform interrupt handler for the primary serial port.
+//
+// * On x86_64, this is IRQ 0x24, used for COM1 and COM3 serial ports.
+// * On aarch64, this is interrupt 0x21, used for the PL011 UART serial port.
+interrupt_handler!(primary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + 0x4, _stack_frame, {
+    // log::trace!("COM1/COM3 serial handler");
+
     #[cfg(target_arch = "aarch64")] {
         let mut sp = COM1_SERIAL_PORT.get().unwrap().as_ref().lock();
-        sp.enable_interrupt(SerialPortInterruptEvent::DataReceived, false);
+        sp.acknowledge_interrupt(SerialPortInterruptEvent::DataReceived);
     }
 
     if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
         func()
     }
+
+    // log::trace!("COM1/COM3 serial handler done");
     EoiBehaviour::HandlerDidNotSendEoi
 });
 
-// Cross-platform interrupt handler for COM2 and COM4 (IRQ 0x24 on 0x23).
-interrupt_handler!(com2_com4_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x3), _stack_frame, {
+// Cross-platform interrupt handler, only used on x86_64 for COM2 and COM4 (IRQ 0x23).
+interrupt_handler!(secondary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + 0x3, _stack_frame, {
     // trace!("COM2/COM4 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func()

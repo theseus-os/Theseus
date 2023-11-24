@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "scheduler"
-description = "Provides scheduling functionality for selecting the next task and causing a task switch"
+description = "Provides basic scheduling functionality for preemptive task switching."
 version = "0.1.0"
 edition = "2018"
 
@@ -14,9 +14,10 @@ interrupts = { path = "../interrupts" }
 sleep = { path = "../sleep" }
 task = { path = "../task" }
 
-scheduler_round_robin = { path = "../scheduler_round_robin" }
-scheduler_epoch = { path = "../scheduler_epoch" }
-scheduler_priority = { path = "../scheduler_priority" }
-
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+generic_timer_aarch64 = { path = "../generic_timer_aarch64" }
+kernel_config = { path = "../kernel_config" }
+spin = "0.9.4"

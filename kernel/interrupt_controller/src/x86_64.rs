@@ -1,9 +1,10 @@
 use super::*;
 
-use {
-    apic::{get_my_apic, LapicIpiDestination},
-    ioapic::get_ioapic,
-};
+use apic::{LocalApic, LapicIpiDestination};
+use ioapic::IoApic;
+use madt::Madt;
+use spin::Mutex;
+use sync_irq::IrqSafeRwLock;
 
 #[derive(Debug, Copy, Clone)]
 pub struct SystemInterruptControllerVersion(pub u32);
@@ -14,35 +15,38 @@ pub struct LocalInterruptControllerId(pub u32);
 #[derive(Debug, Copy, Clone)]
 pub struct Priority;
 
-/// Initializes the interrupt controller (not yet used on x86)
-pub fn init() -> Result<(), &'static str> { Ok(()) }
+/// Initializes the interrupt controller(s), including the Local APIC for the BSP
+/// (bootstrap processor) and the system-wide IOAPIC(s).
+pub fn init(kernel_mmi: &memory::MmiRef) -> Result<(), &'static str> {
+    apic::init();
+
+    // Use the MADT ACPI table to initialize more interrupt controller details.
+    {
+        let acpi_tables = acpi::get_acpi_tables().lock();
+        let madt = Madt::get(&acpi_tables)
+            .ok_or("The required MADT ACPI table wasn't found (signature 'APIC')")?;
+        madt.bsp_init(&mut kernel_mmi.lock().page_table)?;
+    }
+
+    Ok(())
+}
 
 /// Structure representing a top-level/system-wide interrupt controller chip,
 /// responsible for routing interrupts between peripherals and CPU cores.
 ///
 /// On x86_64, this corresponds to an IoApic.
-pub struct SystemInterruptController {
-    id: u8,
-}
+pub struct SystemInterruptController(&'static Mutex<IoApic>);
 
-/// Struct representing per-cpu-core interrupt controller chips.
-///
-/// On x86_64, this corresponds to a LocalApic.
-pub struct LocalInterruptController;
+// TODO: implement `SystemInterruptController::get()` for IOAPIC,
+//       but it needs to be able to handle multiple IOAPICs.
 
 impl SystemInterruptControllerApi for SystemInterruptController {
-    fn get() -> &'static Self {
-        unimplemented!()
-    }
-
     fn id(&self) -> SystemInterruptControllerId {
-        let mut int_ctlr = get_ioapic(self.id).expect("BUG: id(): get_ioapic() returned None");
-        SystemInterruptControllerId(int_ctlr.id())
+        SystemInterruptControllerId(self.0.lock().id())
     }
 
     fn version(&self) -> SystemInterruptControllerVersion {
-        let mut int_ctlr = get_ioapic(self.id).expect("BUG: version(): get_ioapic() returned None");
-        SystemInterruptControllerVersion(int_ctlr.version())
+        SystemInterruptControllerVersion(self.0.lock().version())
     }
 
     fn get_destination(
@@ -55,82 +59,53 @@ impl SystemInterruptControllerApi for SystemInterruptController {
     fn set_destination(
         &self,
         sys_int_num: InterruptNumber,
-        destination: CpuId,
+        destination: Option<CpuId>,
         priority: Priority,
     ) -> Result<(), &'static str> {
-        let mut int_ctlr = get_ioapic(self.id).expect("BUG: set_destination(): get_ioapic() returned None");
-
         // no support for priority on x86_64
         let _ = priority;
 
-        int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num /* <- is this correct? */)
+        if let Some(destination) = destination {
+            self.0.lock().set_irq(sys_int_num, destination.into(), sys_int_num)
+        } else {
+            todo!("SystemInterruptController::set_destination: todo on x86: set the IOREDTBL MASK bit")
+        }
     }
 }
 
 
+/// Struct representing a per-CPU interrupt controller chip.
+///
+/// On x86_64, this corresponds to a LocalApic.
+pub struct LocalInterruptController(&'static IrqSafeRwLock<LocalApic>);
+impl LocalInterruptController {
+    /// Returns a reference to the current CPU's local interrupt controller,
+    /// if it has been initialized.
+    pub fn get() -> Option<Self> {
+        apic::get_my_apic().map(Self)
+    }
+}
+
 impl LocalInterruptControllerApi for LocalInterruptController {
-    fn get() -> &'static Self {
-        unimplemented!()
-    }
-
-    fn init_secondary_cpu_interface(&self) {
-        panic!("This must not be used on x86_64")
-    }
-
     fn id(&self) -> LocalInterruptControllerId {
-        let int_ctlr = get_my_apic().expect("BUG: id(): get_my_apic() returned None");
-        let int_ctlr = int_ctlr.read();
-        LocalInterruptControllerId(int_ctlr.processor_id())
+        LocalInterruptControllerId(self.0.read().apic_id().value())
     }
 
-    fn get_local_interrupt_priority(&self, num: InterruptNumber) -> Priority {
-        // No priority support on x86_64
-        Priority
-    }
-
-    fn set_local_interrupt_priority(&self, num: InterruptNumber, priority: Priority) {
-        // No priority support on x86_64
-        let _ = priority;
-    }
-
-    fn is_local_interrupt_enabled(&self, num: InterruptNumber) -> bool {
-        todo!()
-    }
-
-    fn enable_local_interrupt(&self, num: InterruptNumber, enabled: bool) {
-        todo!()
+    fn enable_local_timer_interrupt(&self, enable: bool) {
+        self.0.write().enable_lvt_timer(enable)
     }
 
     fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
         use InterruptDestination::*;
 
-        let mut int_ctlr = get_my_apic().expect("BUG: send_ipi(): get_my_apic() returned None");
-        let mut int_ctlr = int_ctlr.write();
-        int_ctlr.send_ipi(num, match dest {
+        self.0.write().send_ipi(num, match dest {
             SpecificCpu(cpu) => LapicIpiDestination::One(cpu.into()),
             AllOtherCpus => LapicIpiDestination::AllButMe,
         });
     }
 
-    fn get_minimum_priority(&self) -> Priority {
-        // No priority support on x86_64
-        Priority
-    }
-
-    fn set_minimum_priority(&self, priority: Priority) {
-        // No priority support on x86_64
-        let _ = priority;
-    }
-
-    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
-        panic!("This must not be used on x86_64")
-    }
-
     fn end_of_interrupt(&self, _number: InterruptNumber) {
-        let mut int_ctlr = get_my_apic().expect("BUG: end_of_interrupt(): get_my_apic() returned None");
-        let mut int_ctlr = int_ctlr.write();
-
-        // On x86, passing the number isn't required.
-        int_ctlr.eoi();
+        // When using APIC, we don't need to pass in an IRQ number.
+        self.0.write().eoi();
     }
 }

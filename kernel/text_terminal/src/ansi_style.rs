@@ -419,7 +419,7 @@ bitflags! {
     ///
     /// This set of flags is completely self-contained within each `Unit`
     /// and does not need to reference any previous `Unit`'s flag as an anchor.
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
     pub struct FormatFlags: u8 {
         /// If set, this character is displayed in a bright color, which is sometimes called "bold".
         const BRIGHT                    = 1 << 0;

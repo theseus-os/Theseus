@@ -1,0 +1,33 @@
+name: QEMU Test
+on:
+  pull_request:
+    types: [synchronize, opened, reopened]
+    paths-ignore:
+      - 'book/**'
+      - 'c_test/**'
+      - 'docker/**'
+      - 'github_pages/**'
+      - 'old_crates/**'
+      - 'scripts/**'
+      - '.gitignore'
+      - 'LICENSE-MIT'
+      - 'README.md'
+      - 'bochsrc.txt'
+      - 'rustfmt.toml'
+      - 'slirp.conf'
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Initialize git submodules"
+        run: |
+          git submodule update --init --recursive
+      - name: "Install dependencies"
+        run: |
+          sudo apt update
+          sudo apt install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm wget
+      - name: "Run tests"
+        working-directory: .
+        run: make test
+        timeout-minutes: 10

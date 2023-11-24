@@ -6,19 +6,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+log = "0.4.8"
 spin = "0.9.4"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.runqueue]
-path = "../runqueue"
-
-[dependencies.runqueue_round_robin]
-path = "../runqueue_round_robin"
+task = { path = "../task" }
 
 [lib]
 crate-type = ["rlib"]

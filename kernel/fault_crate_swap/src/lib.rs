@@ -29,7 +29,7 @@ use mod_mgmt::{
     NamespaceDir,
     IntoCrateObjectFile,
 };
-use path::Path;
+use path::PathBuf;
 use crate_swap::{SwapRequest, swap_crates};
 use fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_handled_fault};
 
@@ -73,7 +73,7 @@ pub fn do_self_swap(
         let (into_new_crate_file, new_namespace) = {
             if let Some(f) = override_namespace_crate_dir.as_ref().and_then(|ns_dir| ns_dir.get_file_starting_with(crate_name)) {
                 (IntoCrateObjectFile::File(f), None)
-            } else if let Some(FileOrDir::File(f)) = Path::new(String::from(crate_name)).get(curr_dir) {
+            } else if let Some(FileOrDir::File(f)) = PathBuf::from(String::from(crate_name)).get(curr_dir) {
                 (IntoCrateObjectFile::File(f), None)
             } else {
                 (IntoCrateObjectFile::Prefix(String::from(crate_name)), None)

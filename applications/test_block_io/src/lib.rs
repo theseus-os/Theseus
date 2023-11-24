@@ -5,28 +5,25 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-// #[macro_use] extern crate app_io;
-extern crate task;
-extern crate io;
-extern crate core2;
-extern crate storage_manager;
-extern crate ata;
-
 
 use core::ops::{DerefMut};
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::string::String;
+use app_io::println;
 use ata::AtaDrive;
 use io::{ByteReader, ByteReaderWrapper, ByteReaderWriterWrapper, ByteWriter, ByteWriterWrapper, Reader, ReaderWriter};
+use log::{debug, error, info, trace};
 
 
 pub fn main(_args: Vec<String>) -> isize {
-
-    let dev = storage_manager::storage_devices().next()
-        .expect("no storage devices exist");
+    let dev = if let Some(dev) = storage_manager::storage_devices().next() {
+        dev
+    } else {
+        println!("no storage devices connected");
+        return 0;
+    };
 
     {
         // Call `StorageDevice` trait methods directly

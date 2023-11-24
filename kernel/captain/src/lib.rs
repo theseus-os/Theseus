@@ -93,19 +93,18 @@ pub fn init(
         log::warn!("Couldn't get TSC period");
     }
 
-    // now we initialize early driver stuff, like APIC/ACPI
-    // arch-gate: device_manager currently detects PCI & PS2 devices,
-    // which are unsupported on aarch64 at this point
+    // Initialize early devices, which currently only includes ACPI (x86-specific).
     #[cfg(target_arch = "x86_64")]
     device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())?;
 
-    // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
+    // Initialize local and system-wide interrupt controllers.
+    // TODO: move this into `interrupts::init()`.
+    interrupt_controller::init(&kernel_mmi_ref)?;
+    
+    // Initialize other arch-specific interrupt stuff, e.g., basic interrupt handlers.
     // arch-gate: the IDT & special stacks are x86_64 specific
     #[cfg(target_arch = "x86_64")]
     let idt = {
-        // does nothing at the moment on x86_64
-        interrupt_controller::init()?;
-
         let (double_fault_stack, privilege_stack) = {
             let mut kernel_mmi = kernel_mmi_ref.lock();
             (
@@ -119,10 +118,8 @@ pub fn init(
     };
 
     #[cfg(target_arch = "aarch64")] {
-        // Initialize the GIC
-        interrupt_controller::init()?;
-
         interrupts::init()?;
+        irq_safety::enable_fast_interrupts();
 
         // register BSP CpuId
         cpu::register_cpu(true)?;

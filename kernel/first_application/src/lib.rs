@@ -24,11 +24,11 @@ extern crate path;
 
 use alloc::format;
 use mod_mgmt::CrateNamespace;
-use path::Path;
 
 /// See the crate-level docs and this crate's `Cargo.toml` for more.
 const FIRST_APPLICATION_CRATE_NAME: &str = {
-    #[cfg(target_arch = "x86_64")] { "shell-" }
+    #[cfg(all(target_arch = "x86_64", feature = "qemu_test"))] { "qemu_test-" }
+    #[cfg(all(target_arch = "x86_64", not(feature = "qemu_test")))] { "shell-" }
     #[cfg(target_arch = "aarch64")] { "hello-" }
 };
 
@@ -49,9 +49,9 @@ pub fn start() -> Result<(), &'static str> {
         FIRST_APPLICATION_CRATE_NAME,
     ).ok_or("Couldn't find first application in default app namespace")?;
 
-    let path = Path::new(app_file.lock().get_absolute_path());
+    let path = app_file.lock().get_absolute_path();
     info!("Starting first application: crate at {:?}", path);
-    spawn::new_application_task_builder(path, Some(new_app_ns))?
+    spawn::new_application_task_builder(path.as_ref(), Some(new_app_ns))?
         .name(format!("first_{}", &FIRST_APPLICATION_CRATE_NAME[.. FIRST_APPLICATION_CRATE_NAME.len() - 1]))
         .spawn()?;
 

@@ -1,0 +1,13 @@
+[package]
+name = "qemu_test"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Automated test runner"
+edition = "2021"
+
+[dependencies]
+app_io = { path = "../../kernel/app_io" }
+path = { path = "../../kernel/path" }
+qemu-exit = "3.0.2"
+spawn = { path = "../../kernel/spawn" }
+task = { path = "../../kernel/task" }

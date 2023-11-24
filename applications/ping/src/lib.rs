@@ -67,7 +67,7 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn _main(matches: Matches) -> Result<(), &'static str> {
-    let remote = IpAddress::from_str(matches.free.get(0).ok_or("no arguments_provided")?)
+    let remote = IpAddress::from_str(matches.free.first().ok_or("no arguments_provided")?)
         .map_err(|_| "invalid argument")?;
 
     let interface = net::get_default_interface().ok_or("no network interfaces available")?;

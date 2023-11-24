@@ -66,7 +66,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     // Verify passed preopened directories are real directories.
     for dir in preopened_dirs.iter() {
-        let dir_path = Path::new(dir.clone());
+        let dir_path: &Path = dir.as_ref();
 
         match dir_path.get(&curr_wd) {
             Some(file_dir_enum) => match file_dir_enum {
@@ -92,7 +92,7 @@ pub fn main(args: Vec<String>) -> isize {
         return -1;
     }
 
-    let wasm_binary_path = Path::new(args[0].clone());
+    let wasm_binary_path: &Path = args[0].as_ref();
 
     // Parse inputted WebAssembly binary path into byte array.
     let wasm_binary: Vec<u8> = match wasm_binary_path.get(&curr_wd) {

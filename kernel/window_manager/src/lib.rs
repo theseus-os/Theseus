@@ -31,18 +31,17 @@ extern crate color;
 use alloc::collections::VecDeque;
 use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
-use alloc::vec::{Vec};
+use alloc::vec::Vec;
 use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use framebuffer::{Framebuffer, AlphaPixel};
-use color::{Color};
+use color::Color;
 use shapes::{Coord, Rectangle};
 use framebuffer_compositor::{FRAME_COMPOSITOR};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
-use path::Path;
 use spin::{Mutex, Once};
 use window_inner::{WindowInner, WindowMovingStatus};
 
@@ -493,7 +492,7 @@ impl WindowManager {
             bottom_right: self.mouse + (MOUSE_POINTER_SIZE_X as isize, MOUSE_POINTER_SIZE_Y as isize)
         });
         
-        self.refresh_top(bounding_box.into_iter())
+        self.refresh_top(bounding_box)
     }
 
     /// Move mouse. `relative` indicates the new position relative to current position.
@@ -769,8 +768,8 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
         let new_app_namespace = mod_mgmt::create_application_namespace(None)?;
         let shell_objfile = new_app_namespace.dir().get_file_starting_with("shell-")
             .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
-        let path = Path::new(shell_objfile.lock().get_absolute_path());
-        spawn::new_application_task_builder(path, Some(new_app_namespace))?
+        let path = shell_objfile.lock().get_absolute_path();
+        spawn::new_application_task_builder(path.as_ref(), Some(new_app_namespace))?
             .name("shell".to_string())
             .spawn()?;
 

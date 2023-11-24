@@ -11,10 +11,10 @@ jobs:
         run: |
           git submodule update --init --recursive
       - name: "Install nasm"
-        run: sudo apt install nasm
+        run: |
+          sudo apt update
+          sudo apt install nasm
       - name: "Run Clippy"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: .
         run: |
           make clippy ARCH=x86_64

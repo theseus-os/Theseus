@@ -1,7 +1,6 @@
-use memory::{MappedPages, PAGE_SIZE, map_frame_range, MMIO_FLAGS};
 use super::{TriState, SerialPortInterruptEvent};
 use arm_boards::BOARD_CONFIG;
-use pl011::PL011;
+use uart_pl011::Pl011;
 use core::fmt;
 
 /// The base port I/O addresses for COM serial ports.
@@ -19,11 +18,10 @@ pub enum SerialPortAddress {
 }
 
 /// A serial port and its various data and control registers.
+#[derive(Debug)]
 pub struct SerialPort {
     port_address: SerialPortAddress,
-    inner: Option<PL011>,
-    // Owner of the MMIO frames for the PL011 registers
-    _mapped_pages: Option<MappedPages>,
+    inner: Option<Pl011>,
 }
 
 impl Drop for SerialPort {
@@ -33,7 +31,6 @@ impl Drop for SerialPort {
         if let TriState::Taken = &*sp_locked {
             let dummy = SerialPort {
                 inner: None,
-                _mapped_pages: None,
                 port_address: self.port_address,
             };
             let dropped = core::mem::replace(self, dummy);
@@ -57,19 +54,12 @@ impl SerialPort {
             None => panic!("Board doesn't have {:?}", serial_port_address),
         };
 
-        let mapped_pages = map_frame_range(*mmio_base, PAGE_SIZE, MMIO_FLAGS)
-            .expect("serial_port_basic: couldn't map the UART interface");
-        let addr = mapped_pages.start_address().value();
-        let mut pl011 = PL011::new(addr as *mut _);
-
-        pl011.enable_rx_interrupt(true);
-        pl011.set_fifo_mode(false);
-        // pl011.log_status();
+        let pl011 = Pl011::new(*mmio_base)
+            .expect("SerialPort::new: Couldn't initialize PL011 UART");
 
         SerialPort {
             port_address: serial_port_address,
             inner: Some(pl011),
-            _mapped_pages: Some(mapped_pages),
         }
     }
 
@@ -79,6 +69,15 @@ impl SerialPort {
     pub fn enable_interrupt(&mut self, event: SerialPortInterruptEvent, enable: bool) {
         if matches!(event, SerialPortInterruptEvent::DataReceived) {
             self.inner.as_mut().unwrap().enable_rx_interrupt(enable);
+        } else {
+            unimplemented!()
+        }
+    }
+
+    /// Clears an interrupt in the serial port controller
+    pub fn acknowledge_interrupt(&mut self, event: SerialPortInterruptEvent) {
+        if matches!(event, SerialPortInterruptEvent::DataReceived) {
+            self.inner.as_mut().unwrap().acknowledge_rx_interrupt();
         } else {
             unimplemented!()
         }
