@@ -564,6 +564,7 @@ dependencies = [
  "mouse",
  "spin 0.9.4",
  "sync_spin",
+ "time",
  "waker",
  "zerocopy",
 ]
@@ -1434,6 +1435,7 @@ dependencies = [
  "log",
  "memory",
  "page_attribute_table",
+ "time",
  "zerocopy",
 ]
 
@@ -3356,6 +3358,7 @@ dependencies = [
  "spin 0.9.4",
  "stdio",
  "task",
+ "time",
 ]
 
 [[package]]

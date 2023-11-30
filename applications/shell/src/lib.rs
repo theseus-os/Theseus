@@ -1,6 +1,6 @@
 //! Shell with event-driven architecture
 //! Commands that can be run are the names of the crates in the applications directory
-//! 
+//!
 //! The shell has the following responsibilities: handles key events delivered from terminal, manages terminal display,
 //! spawns and manages tasks, and records the history of executed user commands.
 
@@ -93,7 +93,7 @@ pub fn main(_args: Vec<String>) -> isize {
             Err(err) => {
                 error!("{}", err);
                 error!("failed to spawn shell");
-                return -1; 
+                return -1;
             }
         };
     }
@@ -118,12 +118,12 @@ pub fn main(_args: Vec<String>) -> isize {
     // return 0;
 }
 
-/// Errors when attempting to invoke an application from the terminal. 
+/// Errors when attempting to invoke an application from the terminal.
 enum AppErr {
-    /// The command does not match the name of any existing application in the 
-    /// application namespace directory. 
+    /// The command does not match the name of any existing application in the
+    /// application namespace directory.
     NotFound(String),
-    /// The terminal could not find the application namespace due to a filesystem error. 
+    /// The terminal could not find the application namespace due to a filesystem error.
     NamespaceErr,
     /// The terminal could not spawn a new task to run the new application.
     /// Includes the String error returned from the task spawn function.
@@ -188,7 +188,7 @@ impl Shell {
     }
 
     /// Insert a character to the command line buffer in the shell.
-    /// The position to insert is determined by the position of the cursor in the terminal. 
+    /// The position to insert is determined by the position of the cursor in the terminal.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
@@ -218,7 +218,7 @@ impl Shell {
         if sync_terminal {
             self.terminal.lock().remove_char(cursor_offset_from_end)?;
         }
-        if !erase_left {            
+        if !erase_left {
             self.update_cursor_pos(cursor_offset_from_end - 1)?;
         }
         Ok(())
@@ -301,7 +301,7 @@ impl Shell {
             self.update_cursor_pos(offset_from_end - 1)?;
         }
         self.terminal.lock().cursor.enable();
-        
+
         Ok(())
     }
 
@@ -316,7 +316,7 @@ impl Shell {
             terminal.update_cursor_pos(offset_from_end, self.cmdline.as_bytes()[self.cmdline.len() - offset_from_end]);
         }
         terminal.cursor.enable();
-        
+
         Ok(())
     }
 
@@ -362,10 +362,10 @@ impl Shell {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {       
+    fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {
         // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
         if keyevent.action != KeyAction::Pressed {
-            return Ok(()); 
+            return Ok(());
         }
 
         // Ctrl+C signals the shell to exit the job
@@ -414,7 +414,7 @@ impl Shell {
                 self.redisplay_prompt();
                 return Ok(());
             }
-            
+
             return Ok(());
         }
 
@@ -482,7 +482,7 @@ impl Shell {
             return Ok(());
         }
 
-        // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
+        // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
             if cmdline.is_empty() && self.fg_job_num.is_none() {
@@ -531,7 +531,7 @@ impl Shell {
             return Ok(());
         }
 
-        // handle navigation keys: home, end, page up, page down, up arrow, down arrow 
+        // handle navigation keys: home, end, page up, page down, up arrow, down arrow
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.is_control() {
             return self.terminal.lock().move_screen_to_begin();
         }
@@ -617,7 +617,7 @@ impl Shell {
         let cmd_crate_name = format!("{cmd}-");
         let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
         let app_file = matching_apps.next();
-        let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
+        let second_match = matching_apps.next(); // return an error if there are multiple matching apps
         let app_path = app_file.xor(second_match)
             .map(|f| f.lock().get_absolute_path())
             .ok_or(AppErr::NotFound(cmd))?;
@@ -628,7 +628,7 @@ impl Shell {
             .block()
             .spawn()
             .map_err(|e| AppErr::SpawnErr(e.to_string()))?;
-        
+
         taskref.set_env(self.env.clone()); // Set environment variable of application to the same as terminal task
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
@@ -855,7 +855,7 @@ impl Shell {
 
         // Try to match the name of the file.
         let locked_working_dir = curr_wd.lock();
-        let mut child_list = locked_working_dir.list(); 
+        let mut child_list = locked_working_dir.list();
         child_list.reverse();
         for child in child_list.iter() {
             if child.starts_with(incomplete_node) {
@@ -1199,15 +1199,15 @@ impl Shell {
 
     /// This main loop is the core component of the shell's event-driven architecture. The shell receives events
     /// from two queues
-    /// 
+    ///
     /// 1) The print queue handles print events from applications. The producer to this queue
     ///    is any EXTERNAL application that prints to the terminal.
-    /// 
+    ///
     /// 2) The input queue (provided by the window manager when the temrinal request a window) gives key events
     ///    and resize event to the application.
-    /// 
+    ///
     /// The print queue is handled first inside the loop iteration, which means that all print events in the print
-    /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
+    /// queue will always be printed to the text display before input events or any other managerial functions are handled.
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
     fn start(mut self) -> Result<(), &'static str> {
         let mut need_refresh = false;
@@ -1250,11 +1250,11 @@ impl Shell {
                     Event::Keyboard(input_event) => {
                         self.key_event_producer.write_one(input_event);
                     }
-                    _unhandled => { 
+                    _unhandled => {
                         // trace!("Shell is ignoring unhandled event: {:?}", _unhandled);
                     }
                 };
-            }          
+            }
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
@@ -1279,8 +1279,10 @@ impl Shell {
                 }
             }
             if need_refresh {
+                let start = time::Instant::now();
                 // update if there are inputs
                 self.terminal.lock().refresh_display()?;
+                log::info!("total took: {:?}", time::Instant::now().duration_since(start));
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }

@@ -19,7 +19,7 @@ use core::{
 
 use async_channel::Channel;
 use futures::StreamExt;
-use graphics::GraphicsDriver;
+use graphics::{GraphicsDriver, Horizontal, Vertical};
 pub use graphics::{AlphaPixel, Coordinates, Framebuffer, Pixel, Rectangle};
 use hashbrown::HashMap;
 use keyboard::KeyEvent;
@@ -94,12 +94,16 @@ where
 
     // TODO: Take into account windows above.
     // TODO: Take into account dirty rectangle.
-    for (i, row) in window.framebuffer.rows().enumerate() {
-        let start = (window.coordinates.y + i) * framebuffer.stride();
-        let end = start + row.len();
-        framebuffer[start..end].clone_from_slice(row);
+    let left = dirty.x(Horizontal::Left);
+    let width = dirty.width();
+
+    for y in dirty.y(Vertical::Top)..(dirty.y(Vertical::Bottom) + 1) {
+        let start = y * framebuffer.stride() + left;
+        let end = start + width;
+        framebuffer[start..end].clone_from_slice(&window.framebuffer[start..end]);
     }
 
+    // log::warn!("a: {:?}", time::Instant::now().duration_since(start));
     // TODO: This should be called in an interrupt handler or something like that to
     //  prevent screen tearing.
     driver.swap(&[absolute(window.coordinates, dirty)]);
@@ -147,10 +151,12 @@ async fn compositor_loop(mut driver: GraphicsDriver<AlphaPixel>, mut channels: C
         // The select macro is not available in no_std.
         futures::select_biased!(
             request = channels.window.next() => {
+                let start = time::Instant::now();
                 let request = request.unwrap();
                 handle_window_request(&mut driver, request).await;
             }
             request = channels.keyboard.next() => {
+                let start = time::Instant::now();
                 let request = request.unwrap();
                 handle_keyboard_request(request);
             }

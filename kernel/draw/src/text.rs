@@ -1,7 +1,7 @@
 // TODO: Move `font` crate to libs
 
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use geometry::Coordinates;
+use geometry::{Coordinates, Rectangle};
 use graphics::{Framebuffer, Pixel};
 
 use crate::{Char, Drawable, Settings};
@@ -77,7 +77,7 @@ impl<T> Drawable for Text<T>
 where
     T: AsRef<str>,
 {
-    fn draw<P>(&self, framebuffer: &mut Framebuffer<P>, settings: &Settings<P>)
+    fn draw<P>(&self, framebuffer: &mut Framebuffer<P>, settings: &Settings<P>) -> Rectangle
     where
         P: Pixel,
     {
@@ -93,6 +93,8 @@ where
         let mut row = 0;
         let mut column = 0;
 
+        let mut bounding_box = Rectangle::new(self.coordinates, 0, 0);
+
         for c in s.chars() {
             if c == '\n' {
                 column = 0;
@@ -100,11 +102,13 @@ where
             } else {
                 let coordinates = self.coordinates
                     + Coordinates::new(column * CHARACTER_WIDTH, row * CHARACTER_HEIGHT);
-                Char {
+                let char_bounding_area = Char {
                     coordinates,
                     inner: c,
                 }
                 .draw(framebuffer, settings);
+
+                bounding_box = bounding_box.merge(&char_bounding_area);
 
                 column += 1;
 
@@ -118,5 +122,7 @@ where
                 break;
             }
         }
+
+        bounding_box
     }
 }

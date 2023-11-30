@@ -5,6 +5,7 @@ mod framebuffer;
 mod pixel;
 
 use core::cmp::min;
+
 pub use geometry::{Coordinates, Horizontal, Rectangle, Vertical};
 
 pub use crate::{
@@ -38,18 +39,19 @@ where
     }
 
     pub fn swap(&mut self, rectangles: &[Rectangle]) {
-        use geometry::{
-            Horizontal::{Left, Right},
-            Vertical::{Bottom, Top},
-        };
-
+        let start = time::Instant::now();
         for rectangle in rectangles {
-            let top = rectangle.y(Top);
-            let bottom = min(rectangle.y(Bottom), self.height() - 1);
+            let top = rectangle.y(Vertical::Top);
+            // Non-inclusive
+            let bottom = min(top + rectangle.height(), self.height());
 
-            let left = rectangle.x(Left);
+            let left = rectangle.x(Horizontal::Left);
+            // Non-inclusive
             // TODO: Width or stride?
-            let right = min(rectangle.x(Right), self.width() - 1);
+            let right = min(left + rectangle.width(), self.width());
+
+            // log::error!("{rectangle:?}");
+            // log::error!("{top:?} {bottom:?} {left:?} {right:?}");
 
             if left == 0
                 && right == self.stride() - 1
@@ -57,12 +59,12 @@ where
                 && self.width() == self.stride()
             {
                 let start = top * self.stride();
-                let end = (bottom + 1) * self.stride();
+                let end = bottom * self.stride();
 
                 self.front[start..end].copy_from_slice(&self.back[start..end]);
             }
 
-            let num_rows = bottom - top + 1;
+            let num_rows = bottom - top;
 
             for (front_row, back_row) in self
                 .front
@@ -74,6 +76,8 @@ where
                 front_row[left..right].copy_from_slice(&back_row[left..right]);
             }
         }
+        // log::warn!("thingy took: {:?}", time::Instant::now().duration_since(start));
+        // log::warn!("rectangle length: {}", rectangles.len());
     }
 
     // The front and back buffers have the same dimension.

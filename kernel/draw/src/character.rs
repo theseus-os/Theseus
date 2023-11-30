@@ -1,5 +1,5 @@
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use geometry::Coordinates;
+use geometry::{Coordinates, Rectangle};
 use graphics::{Framebuffer, Pixel};
 
 use crate::{Drawable, Settings};
@@ -19,7 +19,7 @@ impl Char {
 }
 
 impl Drawable for Char {
-    fn draw<P>(&self, framebuffer: &mut Framebuffer<P>, settings: &Settings<P>)
+    fn draw<P>(&self, framebuffer: &mut Framebuffer<P>, settings: &Settings<P>) -> Rectangle
     where
         P: Pixel,
     {
@@ -47,5 +47,7 @@ impl Drawable for Char {
                 }
             }
         }
+
+        Rectangle::new(self.coordinates, CHARACTER_WIDTH, CHARACTER_HEIGHT)
     }
 }
