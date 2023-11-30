@@ -8,15 +8,14 @@ edition = "2021"
 [dependencies]
 spin = "0.9.4"
 x86_64 = "0.14.8"
-mpmc = "0.1.6"
 log = "0.4.8"
 once_cell = { version = "1", default-features = false }
 
+[dependencies.async_channel]
+path = "../async_channel"
+
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
-
-[dependencies.event_types]
-path = "../event_types"
 
 [dependencies.ps2]
 path = "../ps2"

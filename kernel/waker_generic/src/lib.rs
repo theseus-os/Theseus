@@ -43,6 +43,7 @@ pub struct Blocker {
     /// If true, this Blocker can cease blocking and return to its caller.
     woken: Arc<Mutex<bool>>,
 }
+
 impl Blocker {
     /// Performs the given `block_action` within this `Blocker`,
     /// looping until the associated waker is woken.

@@ -16,7 +16,7 @@ interrupts = { path = "../interrupts" }
 deferred_interrupt_tasks = { path = "../deferred_interrupt_tasks" }
 
 # Dependencies below here are temporary, for console creation testing.
-async_channel = { path = "../async_channel" }
+mpmc_channel = { path = "../mpmc_channel" }
 
 [lib]
 crate-type = ["rlib"]

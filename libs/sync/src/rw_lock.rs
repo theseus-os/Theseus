@@ -187,6 +187,7 @@ where
 
 /// RAII structure used to release the shared read access of a lock when
 /// dropped.
+#[derive(Debug)]
 pub struct RwLockReadGuard<'a, T, F>
 where
     T: ?Sized,
@@ -223,6 +224,7 @@ where
 
 /// RAII structure used to release the exclusive write access of a lock when
 /// dropped.
+#[derive(Debug)]
 pub struct RwLockWriteGuard<'a, T, F>
 where
     T: ?Sized,

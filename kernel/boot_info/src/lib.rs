@@ -130,6 +130,7 @@ pub struct FramebufferInfo {
     /// The format of the framebuffer and its pixels or characters.
     pub format: FramebufferFormat,
 }
+
 impl FramebufferInfo {
     /// Returns `true` if the bootloader mapped the framebuffer and
     /// can provide its virtual address.

@@ -16,10 +16,10 @@ extern crate rustc_demangle;
 extern crate mod_mgmt;
 extern crate task;
 extern crate xmas_elf;
-extern crate libc; // for basic C types/typedefs used in libc
 
 use core::{
     cmp::{min, max},
+    ffi::c_int,
     ops::{AddAssign, SubAssign, Range},
 };
 use alloc::{collections::BTreeSet, string::{String, ToString}, sync::Arc, vec::Vec};
@@ -118,7 +118,6 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
 }
 
 /// Corresponds to C function:  `int foo()`
-use libc::c_int;
 type StartFunction = fn(args: &[&str], env: &[&str]) -> c_int;
 
 

@@ -2,8 +2,12 @@
 name = "libterm"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
+edition = "2021"
 
 [dependencies]
+compositor = { path = "../compositor" }
+draw = { path = "../draw" }
+geometry = { path = "../../libs/geometry" }
 
 [dependencies.log]
 version = "0.4.8"
@@ -20,33 +24,6 @@ path = "../root"
 
 [dependencies.color]
 path = "../color"
-
-[dependencies.event_types]
-path = "../event_types"
-
-[dependencies.text_display]
-path = "../displayable/text_display"
-
-[dependencies.displayable]
-path = "../displayable"
-
-[dependencies.framebuffer]
-path = "../framebuffer"
-
-[dependencies.shapes]
-path = "../shapes"
-
-[dependencies.framebuffer_drawer]
-path = "../framebuffer_drawer"
-
-[dependencies.framebuffer_printer]
-path = "../framebuffer_printer"
-
-[dependencies.window_manager]
-path = "../window_manager"
-
-[dependencies.window]
-path = "../window"
 
 [dependencies.time]
 path = "../time"

@@ -17,8 +17,10 @@ early_printer = { path = "../early_printer" }
 tlb_shootdown = { path = "../tlb_shootdown" }
 cls_allocator = { path = "../cls_allocator" }
 kernel_config = { path = "../kernel_config" }
+compositor = { path = "../compositor" }
 interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
+graphics = { path = "../graphics" }
 mod_mgmt = { path = "../mod_mgmt" }
 no_drop = { path = "../no_drop" }
 console = { path = "../console" }
@@ -32,7 +34,7 @@ cpu = { path = "../cpu" }
 first_application = { path = "../first_application" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-window_manager = { path = "../window_manager" }
+compositor = { path = "../compositor" }
 exceptions_full = { path = "../exceptions_full" }
 multiple_heaps = { path = "../multiple_heaps" }
 time = { path = "../time" }

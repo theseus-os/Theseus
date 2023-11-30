@@ -181,12 +181,52 @@ pub fn init(
 
     // arch-gate: no windowing/input support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
-    match window_manager::init() {
-        Ok((key_producer, mouse_producer)) => {
-            device_manager::init(key_producer, mouse_producer)?;
-        },
-        Err(error) => {
-            error!("Failed to init window manager (expected if using nographic): {error}");
+    {
+        // Attempt to get the below 3 items of graphic mode info.
+        let mut width_height_paddr: Option<(usize, usize, PhysicalAddress)> = None;
+        // Take possession of the early framebuffer and obtain graphic info from it.
+        if let Some(early_fb) = early_printer::take() {
+            width_height_paddr = Some((
+                early_fb.width as usize,
+                early_fb.height as usize,
+                early_fb.paddr,
+            ));
+            // Here: the early framebuffer's underlying mapping is dropped.
+        }
+
+        // If we booted up other CPUs, we may have switched to a better graphics mode.
+        if let Some(gi) = multicore_bringup::get_graphic_info() {
+            let paddr = PhysicalAddress::new(gi.physical_address() as usize)
+                .ok_or("Graphic mode physical address was invalid")?;
+            let width = gi.width() as usize;
+            let height = gi.height() as usize;
+            width_height_paddr = Some((width, height, paddr));
+        }
+
+        let (width, height, paddr) = width_height_paddr
+            .ok_or("Failed to get graphic mode information!")?;
+        info!("Graphical framebuffer info: {} x {}, at paddr {:#X}",
+            width, height, paddr,
+        );
+        let framebuffer = unsafe {
+            compositor::Framebuffer::new_hardware(
+                paddr,
+                graphics::FramebufferDimensions {
+                    height,
+                    width,
+                    // TODO: This is correct right?
+                    stride: width,
+                }
+            )
+        };
+
+        match compositor::init(graphics::SoftwareDoubleBuffer::new(framebuffer)) {
+            Ok(compositor::Channels { keyboard, mouse, .. }) => {
+                device_manager::init(keyboard, mouse)?;
+            },
+            Err(error) => {
+                error!("Failed to init window manager (expected if using nographic): {error}");
+            }
         }
     }
 

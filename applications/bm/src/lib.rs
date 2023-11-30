@@ -23,7 +23,7 @@ extern crate scheduler;
 extern crate libtest;
 extern crate memory;
 extern crate rendezvous;
-extern crate async_channel;
+extern crate mpmc_channel;
 extern crate simple_ipc;
 extern crate getopts;
 extern crate pmu_x86;
@@ -89,10 +89,10 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("", "fs_delete", "file delete");
     opts.optflag("", "fs", "test code for checking FS' ability");
 
-    opts.optflag("a", "async", "Run IPC bm for the async channel");
+    opts.optflag("m", "mpmc", "Run IPC bm for the mpmc channel");
     opts.optflag("r", "rendezvous", "Run IPC bm for the rendezvous channel");
     opts.optflag("p", "pinned", "Sender and Receiver should be pinned to the same core in the IPC bm");
-    opts.optflag("b", "blocking", "Sender and Receiver should use blocking versions in the async IPC bm");
+    opts.optflag("b", "blocking", "Sender and Receiver should use blocking versions in the mpmc IPC bm");
     opts.optflag("c", "cycles", "Measure the IPC times in reference cycles (need to have a PMU for this option)");
 
 
@@ -157,8 +157,8 @@ pub fn main(args: Vec<String>) -> isize {
 					println!("RENDEZVOUS IPC");
 					do_ipc_rendezvous(pinned, cycles)
 				} else if matches.opt_present("a") {
-					println!("ASYNC IPC");
-					do_ipc_async(pinned, blocking, cycles)
+					println!("MPMC IPC");
+					do_ipc_mpmc(pinned, blocking, cycles)
 				} else {
 					Err("Specify channel type to use")
 				}
@@ -720,9 +720,9 @@ fn rendezvous_task_receiver((sender, receiver): (rendezvous::Sender<u8>, rendezv
     }
 }
 
-/// Measures the round trip time to send a 1-byte message on an async channel. 
-/// Calls `do_ipc_async_inner` multiple times to perform the actual operation
-fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'static str> {
+/// Measures the round trip time to send a 1-byte message on an mpmc channel. 
+/// Calls `do_ipc_mpmc_inner` multiple times to perform the actual operation
+fn do_ipc_mpmc(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
 		Some(CPU_ID!())
 	} else {
@@ -738,9 +738,9 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 
 	for i in 0..TRIES {
 		let lat = if cycles {
-			do_ipc_async_inner_cycles(i+1, TRIES, child_core, blocking)?	
+			do_ipc_mpmc_inner_cycles(i+1, TRIES, child_core, blocking)?	
 		} else {
-			do_ipc_async_inner(i+1, TRIES, child_core, blocking)?
+			do_ipc_mpmc_inner(i+1, TRIES, child_core, blocking)?
 		};
 		tries += lat;
 		vec.push(lat);
@@ -754,14 +754,14 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
 	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
 	if 	max - lat > err || lat - min > err {
-		printlnwarn!("ipc_async_test diff is too big: {} ({} - {})", max-min, max, min);
+		printlnwarn!("ipc_mpmc_test diff is too big: {} ({} - {})", max-min, max, min);
 	}
 	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
 
 	if cycles {
-		printlninfo!("IPC ASYNC result: Round Trip Time: (cycles)",);
+		printlninfo!("IPC MPMC result: Round Trip Time: (cycles)",);
 	} else {
-		printlninfo!("IPC ASYNC result: Round Trip Time: ({})", T_UNIT);
+		printlninfo!("IPC MPMC result: Round Trip Time: ({})", T_UNIT);
 	}
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_pipe` in LMBench when run with the pinned flag enabled");
@@ -772,13 +772,13 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
+fn do_ipc_mpmc_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
-	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
-		(async_task_sender, async_task_receiver)
+	let (sender_task, receiver_task): (fn((mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>)), fn((mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>))) = if blocking {
+		(mpmc_task_sender, mpmc_task_receiver)
 	} else {
-		(async_task_sender_nonblocking, async_task_receiver_nonblocking)
+		(mpmc_task_sender_nonblocking, mpmc_task_receiver_nonblocking)
 	};
 
 	// we first spawn one task to get the overhead of creating and joining the task
@@ -808,8 +808,8 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking:
 		// which is 16 4 KiB-pages, or 65,536 bytes.
 		const CAPACITY: usize = 65536;
 
-		let (sender1, receiver1) = async_channel::new_channel(CAPACITY);
-		let (sender2, receiver2) = async_channel::new_channel(CAPACITY);
+		let (sender1, receiver1) = mpmc_channel::new_channel(CAPACITY);
+		let (sender2, receiver2) = mpmc_channel::new_channel(CAPACITY);
 		
 		let taskref1;
 
@@ -845,14 +845,14 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking:
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
+fn do_ipc_mpmc_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
 	pmu_x86::init()?;
 	let mut counter = start_counting_reference_cycles()?;
 
-	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
-		(async_task_sender, async_task_receiver)
+	let (sender_task, receiver_task): (fn((mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>)), fn((mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>))) = if blocking {
+		(mpmc_task_sender, mpmc_task_receiver)
 	} else {
-		(async_task_sender_nonblocking, async_task_receiver_nonblocking)
+		(mpmc_task_sender_nonblocking, mpmc_task_receiver_nonblocking)
 	};
 
 	// we first spawn one task to get the overhead of creating and joining the task
@@ -883,8 +883,8 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, bl
 		// which is 16 4 KiB-pages, or 65,536 bytes.
 		const CAPACITY: usize = 65536;
 
-		let (sender1, receiver1) = async_channel::new_channel(CAPACITY);
-		let (sender2, receiver2) = async_channel::new_channel(CAPACITY);
+		let (sender1, receiver1) = mpmc_channel::new_channel(CAPACITY);
+		let (sender2, receiver2) = mpmc_channel::new_channel(CAPACITY);
 		
 		let taskref1;
 
@@ -916,25 +916,25 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, bl
 }
 
 /// A task which sends and then receives a message for a number of iterations
-fn async_task_sender((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn mpmc_task_sender((sender, receiver): (mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>)) {
 	let mut msg = 0;
     for _ in 0..ITERATIONS{
-		sender.send(msg).expect("async channel task: could not send message!");
-        msg = receiver.receive().expect("async channel task: could not receive message");
+		sender.send(msg).expect("mpmc channel task: could not send message!");
+        msg = receiver.receive().expect("mpmc channel task: could not receive message");
     }
 }
 
 /// A task which receives and then sends a message for a number of iterations
-fn async_task_receiver((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn mpmc_task_receiver((sender, receiver): (mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>)) {
 	let mut msg;
     for _ in 0..ITERATIONS{
-		msg = receiver.receive().expect("async channel task: could not receive message");
-		sender.send(msg).expect("async channel task: could not send message!");
+		msg = receiver.receive().expect("mpmc channel task: could not receive message");
+		sender.send(msg).expect("mpmc channel task: could not send message!");
     }
 }
 
 /// A task which sends and then receives a message for a number of iterations
-fn async_task_sender_nonblocking((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn mpmc_task_sender_nonblocking((sender, receiver): (mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>)) {
 	let mut msg = Ok(0);
     for _ in 0..ITERATIONS{
 		while sender.try_send(*msg.as_ref().unwrap()).is_err() {}
@@ -946,7 +946,7 @@ fn async_task_sender_nonblocking((sender, receiver): (async_channel::Sender<u8>,
 }
 
 /// A task which receives and then sends a message for a number of iterations
-fn async_task_receiver_nonblocking((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn mpmc_task_receiver_nonblocking((sender, receiver): (mpmc_channel::Sender<u8>, mpmc_channel::Receiver<u8>)) {
 	let mut msg;
     for _ in 0..ITERATIONS{
 		msg = receiver.try_receive();

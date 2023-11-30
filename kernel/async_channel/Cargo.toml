@@ -1,32 +1,12 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "async_channel"
-description = "Channel for asynchronous Inter-Task Communication via a bounded buffer"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-crossbeam-utils = { version = "0.8.12", default-features = false }
+async_wait_queue = { path = "../async_wait_queue" }
+dreadnought = { path = "../dreadnought" }
+futures = { version = "0.3.28", default-features = false }
 mpmc = "0.1.6"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.debugit]
-path = "../../libs/debugit"
-
-[dependencies.wait_queue]
-path = "../wait_queue"
-
-[dependencies.sync]
-path = "../../libs/sync"
-
-[dependencies.sync_spin]
-path = "../../libs/sync_spin"
-
-[dependencies.core2]
-version = "0.4.0"
-default-features = false
-features = ["alloc", "nightly"]
-
-[lib]
-crate-type = ["rlib"]
+sync = { path = "../../libs/sync" }
+sync_spin = { path = "../../libs/sync_spin" }

@@ -9,7 +9,6 @@
 use cpu::CpuId;
 
 /// A reference to the preemption counter for the current CPU (in CPU-local storage).
-// NOTE: This offset must be kept in sync with `cpu_local::PerCpuField`.
 #[cls_macros::cpu_local(cls_dep = false)]
 static PREEMPTION_COUNT: u8 = 0;
 
@@ -115,8 +114,9 @@ impl PreemptionGuard {
 impl Drop for PreemptionGuard {
     fn drop(&mut self) {
         let cpu_id = cpu::current_cpu();
-        assert!(
-            self.cpu_id == cpu_id,
+        assert_eq!(
+            self.cpu_id,
+            cpu_id,
             "PreemptionGuard::drop(): BUG: CPU IDs did not match! \
             Task unexpectedly migrated from CPU {} to CPU {}.",
             self.cpu_id,

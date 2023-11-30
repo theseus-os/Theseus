@@ -1,5 +1,6 @@
 use super::*;
 use time::{Duration, Instant};
+use draw::{Coordinates, Settings, Text, Rectangle, Drawable, Char};
 
 /// The cursor structure used in the terminal.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
@@ -61,7 +62,7 @@ impl Cursor {
 
     /// Display a cursor in a framebuffer
     /// # Arguments
-    /// * `coordinate`: the start point of a textarea in the framebuffer.
+    /// * `coordinates`: the start point of a textarea in the framebuffer.
     /// * `column`: the column of the cursor in the textarea.
     /// * `line`: the line of the cursor in the textarea.
     /// * `framebuffer`: the framebuffer to display the cursor in.
@@ -69,47 +70,32 @@ impl Cursor {
     /// Returns a bounding box which wraps the cursor.
     pub fn display<P: Pixel>(
         &mut self,
-        coordinate: Coord,
+        coordinates: Coordinates,
         column: usize,
         line: usize,
         framebuffer: &mut Framebuffer<P>,
     ) -> Result<Rectangle, &'static str> where Color: Into<P> {
         if self.blink() {
             if self.show() {
-                framebuffer_drawer::fill_rectangle(
-                    framebuffer,
-                    coordinate
-                        + (
-                            (column * CHARACTER_WIDTH) as isize,
-                            (line * CHARACTER_HEIGHT) as isize,
-                        )
-                        + (0, 1),
-                    CHARACTER_WIDTH,
-                    CHARACTER_HEIGHT - 2,
-                    self.color.into(),
-                );
+                let settings = Settings {
+                    foreground: self.color.into(),
+                    background: None,
+                };
+                let coordinates = coordinates + Coordinates::new(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT);
+                Rectangle::new(coordinates, CHARACTER_WIDTH, CHARACTER_HEIGHT - 2).draw(framebuffer, &settings);
             } else {
-                framebuffer_printer::print_ascii_character(
-                    framebuffer,
-                    self.underlying_char,
-                    FONT_FOREGROUND_COLOR.into(),
-                    FONT_BACKGROUND_COLOR.into(),
-                    coordinate,
-                    column,
-                    line,
-                )
+                let settings = Settings {
+                    foreground: FONT_FOREGROUND_COLOR.into(),
+                    background: Some(FONT_BACKGROUND_COLOR.into()),
+                };
+                let coordinates = coordinates + Coordinates::new(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT);
+                Char::new(self.underlying_char as char, coordinates).draw(framebuffer, &settings);
             }
         }
 
-        let top_left = coordinate
-            + (
-                (column * CHARACTER_WIDTH) as isize,
-                (line * CHARACTER_HEIGHT) as isize,
-            );
-        let bounding_box = Rectangle {
-            top_left,
-            bottom_right: top_left + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
-        };
+        let top_left =
+            coordinates + Coordinates::new(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT);
+        let bounding_box = Rectangle::new(top_left, CHARACTER_WIDTH, CHARACTER_HEIGHT);
 
         Ok(bounding_box)
     }

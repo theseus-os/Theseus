@@ -1,0 +1,10 @@
+[package]
+name = "draw"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+font = { path = "../font" }
+geometry = { path = "../../libs/geometry" }
+graphics = { path = "../graphics" }
+log = "0.4.8"

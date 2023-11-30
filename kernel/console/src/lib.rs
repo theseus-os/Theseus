@@ -5,11 +5,11 @@
 extern crate alloc;
 
 use alloc::{format, sync::Arc};
-use async_channel::Receiver;
 use core::sync::atomic::{AtomicU16, Ordering};
 use core2::io::Write;
 use sync_irq::IrqSafeMutex;
 use log::{error, info, warn};
+use mpmc_channel::Receiver;
 use serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
 use task::{JoinableTaskRef, KillReason};
 
@@ -31,7 +31,7 @@ pub fn ignore_serial_port_input(serial_port_address: u16) {
 ///
 /// Returns the newly-spawned detection task.
 pub fn start_connection_detection() -> Result<JoinableTaskRef, &'static str> {
-    let (sender, receiver) = async_channel::new_channel(4);
+    let (sender, receiver) = mpmc_channel::new_channel(4);
     serial_port::set_connection_listener(sender);
 
     spawn::new_task_builder(console_connection_detector, receiver)
@@ -69,7 +69,7 @@ fn console_connection_detector(
             }
         };
 
-        let (sender, receiver) = async_channel::new_channel(16);
+        let (sender, receiver) = mpmc_channel::new_channel(16);
         if serial_port.lock().set_data_sender(sender).is_err() {
             warn!(
                 "Serial port {:?} already had a data sender, skipping console connection request",

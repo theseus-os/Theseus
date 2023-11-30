@@ -53,7 +53,16 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e61f2b7f93d2c7d2b08263acaa4a363b3e276806c68af6134c44f523bf1aacd"
 dependencies = [
- "gimli",
+ "gimli 0.25.0",
+]
+
+[[package]]
+name = "addr2line"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a30b2e23b9e17a9f90641c7ab1549cd9b44f296d3ccbf309d2863cfe398a0cb"
+dependencies = [
+ "gimli 0.28.0",
 ]
 
 [[package]]
@@ -163,14 +172,22 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
- "core2",
- "crossbeam-utils",
- "debugit",
- "log",
+ "async_wait_queue",
+ "dreadnought",
+ "futures",
  "mpmc",
  "sync",
  "sync_spin",
- "wait_queue",
+]
+
+[[package]]
+name = "async_wait_queue"
+version = "0.1.0"
+dependencies = [
+ "dreadnought",
+ "mpmc_queue",
+ "sync",
+ "sync_spin",
 ]
 
 [[package]]
@@ -211,19 +228,34 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 name = "backtrace"
 version = "0.3.64"
 dependencies = [
- "addr2line",
+ "addr2line 0.16.0",
  "cc",
  "cfg-if 1.0.0",
  "libc",
  "memory",
- "miniz_oxide",
- "object",
+ "miniz_oxide 0.4.4",
+ "object 0.28.4",
  "rustc-demangle",
  "spin 0.9.4",
  "stack_trace",
  "sync_block",
  "theseus_std",
  "thread_local_macro",
+]
+
+[[package]]
+name = "backtrace"
+version = "0.3.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2089b7e3f35b9dd2d0ed921ead4f6d318c27680d4a5bd167b3ee120edb105837"
+dependencies = [
+ "addr2line 0.21.0",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "miniz_oxide 0.7.1",
+ "object 0.32.1",
+ "rustc-demangle",
 ]
 
 [[package]]
@@ -320,7 +352,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "app_io",
- "async_channel",
  "cpu",
  "fs_node",
  "getopts",
@@ -330,6 +361,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "mpmc_channel",
  "path",
  "pmu_x86",
  "rendezvous",
@@ -376,6 +408,7 @@ dependencies = [
  "acpi",
  "app_io",
  "cls_allocator",
+ "compositor",
  "console",
  "cpu",
  "device_manager",
@@ -384,6 +417,7 @@ dependencies = [
  "early_printer",
  "exceptions_full",
  "first_application",
+ "graphics",
  "interrupt_controller",
  "interrupts",
  "irq_safety",
@@ -406,7 +440,6 @@ dependencies = [
  "time",
  "tlb_shootdown",
  "tsc",
- "window_manager",
 ]
 
 [[package]]
@@ -509,7 +542,7 @@ dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
  "quote",
- "syn 2.0.26",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -520,8 +553,20 @@ version = "0.1.0"
 name = "compositor"
 version = "0.1.0"
 dependencies = [
- "framebuffer",
- "shapes",
+ "async_channel",
+ "dreadnought",
+ "futures",
+ "graphics",
+ "hashbrown",
+ "keyboard",
+ "log",
+ "memory",
+ "mouse",
+ "spin 0.9.4",
+ "sync_spin",
+ "time",
+ "waker",
+ "zerocopy",
 ]
 
 [[package]]
@@ -529,12 +574,12 @@ name = "console"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "async_channel",
  "core2",
  "hull",
  "io",
  "log",
  "mod_mgmt",
+ "mpmc_channel",
  "path",
  "serial_port",
  "spawn",
@@ -812,7 +857,7 @@ dependencies = [
  "by_address",
  "crate_metadata",
  "fs_node",
- "gimli",
+ "gimli 0.25.0",
  "goblin",
  "hashbrown",
  "log",
@@ -915,11 +960,11 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "async_channel",
  "console",
  "core2",
  "derive_more",
  "e1000",
- "event_types",
  "fatfs",
  "io",
  "iommu",
@@ -930,7 +975,6 @@ dependencies = [
  "memory",
  "mlx5",
  "mouse",
- "mpmc",
  "net",
  "pci",
  "ps2",
@@ -954,16 +998,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "displayable"
-version = "0.1.0"
-dependencies = [
- "color",
- "framebuffer",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "dmar"
 version = "0.1.0"
 dependencies = [
@@ -979,6 +1013,16 @@ name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
+
+[[package]]
+name = "draw"
+version = "0.1.0"
+dependencies = [
+ "font",
+ "geometry",
+ "graphics",
+ "log",
+]
 
 [[package]]
 name = "dreadnought"
@@ -1063,15 +1107,6 @@ dependencies = [
  "hashbrown",
  "path",
  "root",
-]
-
-[[package]]
-name = "event_types"
-version = "0.1.0"
-dependencies = [
- "keycodes_ascii",
- "mouse_data",
- "shapes",
 ]
 
 [[package]]
@@ -1213,48 +1248,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "framebuffer"
-version = "0.1.0"
-dependencies = [
- "color",
- "early_printer",
- "log",
- "memory",
- "multicore_bringup",
- "page_attribute_table",
- "shapes",
- "zerocopy",
-]
-
-[[package]]
-name = "framebuffer_compositor"
-version = "0.1.0"
-dependencies = [
- "compositor",
- "framebuffer",
- "hashbrown",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "framebuffer_drawer"
-version = "0.1.0"
-dependencies = [
- "framebuffer",
- "shapes",
-]
-
-[[package]]
-name = "framebuffer_printer"
-version = "0.1.0"
-dependencies = [
- "font",
- "framebuffer",
- "shapes",
-]
-
-[[package]]
 name = "fs_node"
 version = "0.1.0"
 dependencies = [
@@ -1267,9 +1260,9 @@ dependencies = [
 
 [[package]]
 name = "futures"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38390104763dc37a5145a53c29c63c1290b5d316d6086ec32c293f6736051bb0"
+checksum = "23342abe12aba583913b2e62f22225ff9c950774065e4bfb61a19cd9770fec40"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -1281,9 +1274,9 @@ dependencies = [
 
 [[package]]
 name = "futures-channel"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52ba265a92256105f45b719605a571ffe2d1f0fea3807304b522c1d778f79eed"
+checksum = "955518d47e09b25bbebc7a18df10b81f0c766eaf4c4f1cccef2fca5f2a4fb5f2"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -1291,44 +1284,44 @@ dependencies = [
 
 [[package]]
 name = "futures-core"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04909a7a7e4633ae6c4a9ab280aeb86da1236243a77b694a49eacd659a4bd3ac"
+checksum = "4bca583b7e26f571124fe5b7561d49cb2868d79116cfa0eefce955557c6fee8c"
 
 [[package]]
 name = "futures-io"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00f5fb52a06bdcadeb54e8d3671f8888a39697dcb0b81b23b55174030427f4eb"
+checksum = "4fff74096e71ed47f8e023204cfd0aa1289cd54ae5430a9523be060cdb849964"
 
 [[package]]
 name = "futures-macro"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdfb8ce053d86b91919aad980c220b1fb8401a9394410e1c289ed7e66b61835d"
+checksum = "89ca545a94061b6365f2c7355b4b32bd20df3ff95f02da9329b34ccc3bd6ee72"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.98",
+ "syn 2.0.32",
 ]
 
 [[package]]
 name = "futures-sink"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39c15cf1a4aa79df40f1bb462fb39676d0ad9e366c2a33b590d7c66f4f81fcf9"
+checksum = "f43be4fe21a13b9781a69afa4985b0f6ee0e1afab2c6f454a8cf30e2b2237b6e"
 
 [[package]]
 name = "futures-task"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ffb393ac5d9a6eaa9d3fdf37ae2776656b706e200c8e16b1bdb227f5198e6ea"
+checksum = "76d3d132be6c0e6aa1534069c705a74a5997a356c0dc2f86a47765e5617c5b65"
 
 [[package]]
 name = "futures-util"
-version = "0.3.25"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "197676987abd2f9cadff84926f410af1c183608d36641465df73ae8211dc65d6"
+checksum = "26b01e40b772d54cf6c6d721c1d1abd0647a0106a12ecaa1c186273392a69533"
 dependencies = [
  "futures-core",
  "futures-macro",
@@ -1376,6 +1369,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "geometry"
+version = "0.1.0"
+
+[[package]]
 name = "getopts"
 version = "0.2.21"
 source = "git+https://github.com/theseus-os/getopts#da1e04828d3ecd6adc90e2da61e2e3cccc7ca97c"
@@ -1414,6 +1411,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0a01e0497841a3b2db4f8afa483cce65f7e96a3498bd6c541734792aeac8fe7"
 
 [[package]]
+name = "gimli"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fb8d784f27acf97159b40fc4db5ecd8aa23b9ad5ef69cdd136d3bc80665f0c0"
+
+[[package]]
 name = "goblin"
 version = "0.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1421,6 +1424,19 @@ checksum = "c65cd533b33e3d04c6e393225fa8919ddfcf5862ca8919c7f9a167c312ef41c2"
 dependencies = [
  "plain",
  "scroll",
+]
+
+[[package]]
+name = "graphics"
+version = "0.1.0"
+dependencies = [
+ "color",
+ "geometry",
+ "log",
+ "memory",
+ "page_attribute_table",
+ "time",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1740,11 +1756,10 @@ version = "0.1.0"
 name = "keyboard"
 version = "0.1.0"
 dependencies = [
- "event_types",
+ "async_channel",
  "interrupts",
  "keycodes_ascii",
  "log",
- "mpmc",
  "once_cell",
  "ps2",
  "spin 0.9.4",
@@ -1797,8 +1812,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.127"
-source = "git+https://github.com/theseus-os/libc?branch=theseus#5e1da08f39d9b25c649f1152e0084585b0adf725"
+version = "0.2.149"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a08173bc88b7955d1b3145aa561539096c421ac8debde8cbc3612ec635fee29b"
 
 [[package]]
 name = "libm"
@@ -1811,21 +1827,15 @@ name = "libterm"
 version = "0.1.0"
 dependencies = [
  "color",
+ "compositor",
  "dfqueue",
- "displayable",
+ "draw",
  "environment",
- "event_types",
  "font",
- "framebuffer",
- "framebuffer_drawer",
- "framebuffer_printer",
+ "geometry",
  "log",
  "root",
- "shapes",
- "text_display",
  "time",
- "window",
- "window_manager",
 ]
 
 [[package]]
@@ -2107,6 +2117,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "miniz_oxide"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7810e0be55b428ada41041c41f32c9f1a42817901b4ccf45fa3d4b6561e74c7"
+dependencies = [
+ "adler",
+]
+
+[[package]]
 name = "mkdir"
 version = "0.1.0"
 dependencies = [
@@ -2218,11 +2237,10 @@ checksum = "7843ec2de400bcbc6a6328c958dc38e5359da6e93e72e37bc5246bf1ae776389"
 name = "mouse"
 version = "0.1.0"
 dependencies = [
- "event_types",
+ "async_channel",
  "interrupts",
  "log",
  "mouse_data",
- "mpmc",
  "ps2",
  "spin 0.9.4",
  "x86_64",
@@ -2240,6 +2258,20 @@ name = "mpmc"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf78b1242a953be96e01b5f8ed8ffdfc8055c0a2b779899b3835e5d27a69dced"
+
+[[package]]
+name = "mpmc_channel"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "crossbeam-utils",
+ "debugit",
+ "log",
+ "mpmc",
+ "sync",
+ "sync_spin",
+ "wait_queue",
+]
 
 [[package]]
 name = "mpmc_queue"
@@ -2491,6 +2523,15 @@ dependencies = [
  "crc32fast",
  "hashbrown",
  "indexmap",
+ "memchr",
+]
+
+[[package]]
+name = "object"
+version = "0.32.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cf5f9dd3933bd50a9e1f149ec995f39ae2c496d31fd772c1fd45ebc27e902b0"
+dependencies = [
  "memchr",
 ]
 
@@ -2970,12 +3011,12 @@ checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
 [[package]]
 name = "region"
 version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76e189c2369884dce920945e2ddf79b3dff49e071a167dd1817fa9c4c00d512e"
 dependencies = [
  "bitflags 1.3.2",
- "core2",
  "libc",
  "mach",
- "memory",
  "winapi",
 ]
 
@@ -3267,11 +3308,11 @@ dependencies = [
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "core2",
  "deferred_interrupt_tasks",
  "interrupts",
  "log",
+ "mpmc_channel",
  "serial_port_basic",
  "spin 0.9.4",
  "sync_irq",
@@ -3299,18 +3340,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "shapes"
-version = "0.1.0"
-
-[[package]]
 name = "shell"
 version = "0.1.0"
 dependencies = [
  "app_io",
  "core2",
- "dfqueue",
  "environment",
- "event_types",
  "fs_node",
  "keycodes_ascii",
  "lazy_static",
@@ -3323,7 +3358,7 @@ dependencies = [
  "spin 0.9.4",
  "stdio",
  "task",
- "window_manager",
+ "time",
 ]
 
 [[package]]
@@ -3594,9 +3629,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.26"
+version = "2.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45c3457aacde3c65315de5031ec191ce46604304d2446e803d71ade03308d970"
+checksum = "239814284fd6f1a4ffe4ca893952cdd93c224b6a1571c9a9eadd670295c0c9e2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3661,8 +3696,9 @@ dependencies = [
 
 [[package]]
 name = "target-lexicon"
-version = "0.12.5"
-source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36cc66df0ac4569df1b20a16ca914f417b85a"
+version = "0.12.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d0e916b1148c8e263850e1ebcbd046f333e0683c724876bb0da63ea4373dc8a"
 
 [[package]]
 name = "task"
@@ -3740,7 +3776,7 @@ name = "test_backtrace"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "backtrace",
+ "backtrace 0.3.64",
  "log",
  "task",
 ]
@@ -3763,10 +3799,10 @@ name = "test_channel"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "async_channel",
  "cpu",
  "getopts",
  "log",
+ "mpmc_channel",
  "rendezvous",
  "scheduler",
  "spawn",
@@ -3945,26 +3981,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "text_display"
-version = "0.1.0"
-dependencies = [
- "color",
- "displayable",
- "font",
- "framebuffer",
- "framebuffer_printer",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "text_terminal"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.4.1",
  "core2",
  "derive_more",
- "event_types",
  "log",
  "unicode-width",
  "vte",
@@ -4128,8 +4150,8 @@ dependencies = [
 name = "tty"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "core2",
+ "mpmc_channel",
  "sync_block",
 ]
 
@@ -4182,8 +4204,8 @@ checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
 name = "unified_channel"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "cfg-if 0.1.10",
+ "mpmc_channel",
  "rendezvous",
 ]
 
@@ -4202,7 +4224,7 @@ version = "0.1.0"
 dependencies = [
  "external_unwind_info",
  "fallible-iterator",
- "gimli",
+ "gimli 0.25.0",
  "interrupts",
  "log",
  "memory",
@@ -4462,17 +4484,15 @@ dependencies = [
 [[package]]
 name = "wasmparser"
 version = "0.81.0"
-source = "git+https://github.com/theseus-os/wasm-tools?branch=no-std-wasmparser#7b0eb0d074606c8a49027e60e452862f5fe183b4"
-dependencies = [
- "hashbrown",
-]
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98930446519f63d00a836efdc22f67766ceae8dbcc1571379f2bcabc6b2b9abc"
 
 [[package]]
 name = "wasmtime"
 version = "0.30.0"
 dependencies = [
  "anyhow",
- "backtrace",
+ "backtrace 0.3.69",
  "bincode",
  "catch_unwind",
  "cfg-if 1.0.0",
@@ -4483,7 +4503,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "object",
+ "object 0.28.4",
  "paste",
  "psm",
  "region",
@@ -4507,12 +4527,12 @@ dependencies = [
  "cfg-if 1.0.0",
  "core2",
  "cranelift-entity",
- "gimli",
+ "gimli 0.25.0",
  "hashbrown",
  "indexmap",
  "log",
  "more-asserts",
- "object",
+ "object 0.28.4",
  "serde",
  "target-lexicon",
  "thiserror_core2",
@@ -4524,16 +4544,16 @@ dependencies = [
 name = "wasmtime-jit"
 version = "0.30.0"
 dependencies = [
- "addr2line",
+ "addr2line 0.16.0",
  "anyhow",
  "bincode",
  "cfg-if 1.0.0",
  "core2",
  "external_unwind_info",
- "gimli",
+ "gimli 0.25.0",
  "log",
  "more-asserts",
- "object",
+ "object 0.28.4",
  "region",
  "serde",
  "target-lexicon",
@@ -4550,7 +4570,7 @@ name = "wasmtime-runtime"
 version = "0.30.0"
 dependencies = [
  "anyhow",
- "backtrace",
+ "backtrace 0.3.69",
  "catch_unwind",
  "cc",
  "cfg-if 1.0.0",
@@ -4611,61 +4631,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
-name = "window"
-version = "0.1.0"
-dependencies = [
- "color",
- "dereffer",
- "event_types",
- "framebuffer",
- "framebuffer_drawer",
- "log",
- "mouse",
- "mpmc",
- "path",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
- "window_manager",
-]
-
-[[package]]
-name = "window_inner"
-version = "0.1.0"
-dependencies = [
- "event_types",
- "framebuffer",
- "mpmc",
- "shapes",
-]
-
-[[package]]
-name = "window_manager"
-version = "0.1.0"
-dependencies = [
- "color",
- "compositor",
- "event_types",
- "font",
- "framebuffer",
- "framebuffer_compositor",
- "framebuffer_drawer",
- "keycodes_ascii",
- "lazy_static",
- "log",
- "mod_mgmt",
- "mouse_data",
- "mpmc",
- "path",
- "scheduler",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
-]
-
-[[package]]
 name = "x86_64"
 version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4710,3 +4675,8 @@ dependencies = [
  "syn 1.0.98",
  "synstructure",
 ]
+
+[[patch.unused]]
+name = "libc"
+version = "0.2.127"
+source = "git+https://github.com/theseus-os/libc?branch=theseus#5e1da08f39d9b25c649f1152e0084585b0adf725"

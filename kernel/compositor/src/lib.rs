@@ -1,199 +1,233 @@
-//! This crate defines a trait of `Compositor`  .
-//! A compositor composites a list of sources buffers to a single destination buffer.
+//! This crate is responsible for composing window buffers, handling window
+//! interactions (e.g. dragging, resizing), and sending input to the correct
+//! window.
+//!
+//! It is roughly equivalent in scope to a compositing window manager on Linux.
 
-#![allow(clippy::range_plus_one)]
 #![no_std]
+#![feature(negative_impls)]
 
-extern crate framebuffer;
-extern crate shapes;
+extern crate alloc;
 
-use core::iter::IntoIterator;
+mod window;
 
-use framebuffer::{Framebuffer, Pixel};
-use shapes::{Coord, Rectangle};
-use core::ops::Range;
+use alloc::sync::Arc;
+use core::{
+    ops::Deref,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-/// A compositor composites (combines or blends) a series of "source" framebuffers onto a single "destination" framebuffer. 
-/// The type parameter `B` allows a compositor to support multiple types of regions or "bounding boxes", 
-/// given by the trait bound `CompositableRegion`.
-pub trait Compositor {
-    /// Composites the framebuffers in the list of source framebuffers `src_fbs` onto the destination framebuffer `dest_fb`.
+use async_channel::Channel;
+use futures::StreamExt;
+use graphics::{GraphicsDriver, Horizontal, Vertical};
+pub use graphics::{AlphaPixel, Coordinates, Framebuffer, Pixel, Rectangle};
+use hashbrown::HashMap;
+use keyboard::KeyEvent;
+use log::error;
+use mouse::MouseEvent;
+use spin::Once;
+use sync_spin::RwLock;
+use window::LockedInner;
+
+use crate::window::Inner;
+pub use crate::window::Window;
+
+static COMPOSITOR: Once<Channel<Request>> = Once::new();
+
+pub fn init<T>(driver: T) -> Result<Channels, &'static str>
+where
+    T: Into<GraphicsDriver<AlphaPixel>>,
+{
+    let mut windows = WINDOWS.write();
+    if windows.is_some() {
+        return Err("initialised compositor multiple times");
+    }
+    *windows = Some(HashMap::new());
+
+    let channels = Channels::new();
+    let cloned = channels.clone();
+    // TODO: Remove clone.
+    COMPOSITOR.call_once(|| channels.window.clone());
+
+    dreadnought::task::spawn_async(compositor_loop(driver.into(), cloned))?;
+    Ok(channels)
+}
+
+pub fn screen_size() -> (usize, usize) {
+    // TODO
+    (0x500, 0x400)
+}
+
+#[derive(Clone)]
+pub struct Request {
+    window_id: usize,
+    ty: RequestType,
+}
+
+#[derive(Clone)]
+enum RequestType {
+    /// Request the compositor to refresh the given dirty rectangle.
     ///
-    /// # Arguments
-    /// * `src_fbs`: an iterator over the source framebuffers to be composited, 
-    ///    along with where in the `dest_fb` they should be composited. 
-    /// * `dest_fb`: the destination framebuffer that will hold the source framebuffers to be composited.
-    /// * `dest_bounding_boxes`: an iterator over bounding boxes that specify which regions
-    ///    in the destination framebuffer should be updated. 
-    ///    For each source framebuffer in `src_fbs`, the compositor will iterate over every bounding box
-    ///    and find the corresponding region in that source framebuffer and then blend that region into the destination.
-    /// 
-    /// For example, if the window manager wants to draw a new partially-transparent window,
-    /// it will pass the framebuffers for all existing windows plus the new window (in bottom-to-top order)
-    /// to the compositor, in the argument `src_fbs`. 
-    /// The `dest_fb` would be the final framebuffer mapped to the display device (screen memory),
-    /// and the `bounding_boxes` would be an iterator over just a single region in the final framebuffer
-    /// where that new window will be located. 
-    /// When the source framebuffers are composited from bottom to top, the compositor will redraw the region of every source framebuffer
-    /// that intersects with that bounding box.
-    ///
-    /// For another example, suppose the window manager wants to draw a transparent mouse pointer on top of all windows.
-    /// It will pass the framebuffers of existing windows as well as a top framebuffer that contains the mouse pointer image.
-    /// In this case, the `bounding_boxes` could be the coordinates of all individual pixels in the mouse pointer image
-    /// (expressed as coordinates in the final framebuffer).
-    fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
-        &mut self,
-        src_fbs: impl IntoIterator<Item = FramebufferUpdates<'a, P>>,
-        dest_fb: &mut Framebuffer<P>,
-        dest_bounding_boxes: impl IntoIterator<Item = B> + Clone,
-    ) -> Result<(), &'static str>;
+    /// The lock on the window must not be held when the request is made, and
+    /// the application must wait for a release event prior to obtaining the
+    /// lock again.
+    Refresh { dirty: Rectangle },
 }
 
-
-/// A source framebuffer to be composited, along with its target position.
-pub struct FramebufferUpdates<'a, P: Pixel> {
-    /// The source framebuffer to be composited.
-    pub src_framebuffer: &'a Framebuffer<P>,
-    /// The coordinate in the destination framebuffer where the source `framebuffer` 
-    /// should be composited. 
-    /// This coordinate is expressed relative to the top-left corner of the destination framebuffer. 
-    pub coordinate_in_dest_framebuffer: Coord,
+#[derive(Clone, Debug)]
+pub enum Event {
+    Keyboard(KeyEvent),
+    Mouse(MouseEvent),
+    Resize(Rectangle),
 }
 
-/// A `CompositableRegion` is an abstract region (i.e., a bounding box) 
-/// that can optimize the compositing (blending) of one framebuffer into another framebuffer
-/// according to the specifics of the region's shape. 
-/// For example, a single 2-D point (`Coord`) offers no real room for optimization 
-/// because only one pixel will be composited,
-/// but a rectangle **does** allow for optimization, as a large chunk of pixels can be composited all at once.
-/// 
-/// In addition, a `CompositableRegion` makes it easier for a compositor to only composite pixels in a subset of a given source framebuffer
-/// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
-pub trait CompositableRegion {
-    /// Returns the number of pixels in the region.
-    fn size(&self) -> usize;
-
-    /// Returns the range of rows covered by this region, 
-    /// given as row indices where row `0` is the top row in the region.
-    fn row_range(&self) -> Range<isize>;
-
-    /// Blends the pixels in the source framebuffer `src_fb` within the range of rows (`src_fb_row_range`) 
-    /// into the pixels in the destination framebuffer `dest_fb`.
-    /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
-    /// where the `src_fb` will be composited (starting at the `src_fb`'s top-left corner).
-    /// `src_fb_row_range` is the index range of rows in the source framebuffer to blend.
-    fn blend_buffers<P: Pixel>(
-        &self, 
-        src_fb: &Framebuffer<P>, 
-        dest_fb: &mut Framebuffer<P>, 
-        dest_coord: Coord,
-        src_fb_row_range: Range<usize>       
-    ) -> Result<(), &'static str>;
+fn absolute(coordinates: Coordinates, mut rectangle: Rectangle) -> Rectangle {
+    rectangle.coordinates += coordinates;
+    rectangle
 }
 
-impl CompositableRegion for Coord {
-    #[inline]
-    fn row_range(&self) -> Range<isize> {
-        self.y..self.y + 1
+fn refresh<T>(driver: &mut GraphicsDriver<AlphaPixel>, window: T, dirty: Rectangle)
+where
+    T: Deref<Target = LockedInner> + core::fmt::Debug,
+{
+    let framebuffer = driver.back();
+
+    // TODO: Take into account windows above.
+    // TODO: Take into account dirty rectangle.
+    let left = dirty.x(Horizontal::Left);
+    let width = dirty.width();
+
+    for y in dirty.y(Vertical::Top)..(dirty.y(Vertical::Bottom) + 1) {
+        let start = y * framebuffer.stride() + left;
+        let end = start + width;
+        framebuffer[start..end].clone_from_slice(&window.framebuffer[start..end]);
     }
 
-    #[inline]
-    fn size(&self) -> usize {
-        1
-    }
+    // log::warn!("a: {:?}", time::Instant::now().duration_since(start));
+    // TODO: This should be called in an interrupt handler or something like that to
+    //  prevent screen tearing.
+    driver.swap(&[absolute(window.coordinates, dirty)]);
+}
 
-    fn blend_buffers<P: Pixel>(
-        &self, 
-        src_fb: &Framebuffer<P>,
-        dest_fb: &mut Framebuffer<P>, 
-        dest_coord: Coord,        
-        _src_fb_row_range: Range<usize>,
-    ) -> Result<(), &'static str>{
-        let relative_coord = *self - dest_coord;
-        if let Some(pixel) = src_fb.get_pixel(relative_coord) {
-            dest_fb.draw_pixel(*self, pixel);
+#[derive(Clone)]
+pub struct Channels {
+    // FIXME: Deadlock prevention.
+    pub window: Channel<Request>,
+    // FIXME: Deadlock prevention.
+    pub keyboard: Channel<KeyEvent>,
+    // FIXME: Deadlock prevention.
+    pub mouse: Channel<MouseEvent>,
+}
+
+impl Channels {
+    fn new() -> Self {
+        Self {
+            window: Channel::new(8),
+            keyboard: Channel::new(8),
+            mouse: Channel::new(8),
         }
-        Ok(())
     }
 }
 
-impl CompositableRegion for Rectangle {
-    #[inline]
-    fn row_range(&self) -> Range<isize> {
-        self.top_left.y..self.bottom_right.y
-    }
+// spin rwlock?
+// IDEA(tsoutsman): Optimisation: struct of arrays: RwLock<(Vec<usize>,
+// Vec<Coordinates>), Vec<Framebuffer>, Vec<Channel>)> ordered by z-index. To
+// get all rectangles of windows above window n, just do
+// WINDOWS.read().2[n..].clone() to minimise holding the lock. Not sure about
+// race conditions, and if we need to hold the lock the entire time.
+static WINDOWS: RwLock<Option<HashMap<usize, Arc<Inner>>>> = RwLock::new(None);
+static WINDOW_ID: AtomicUsize = AtomicUsize::new(0);
 
-    #[inline]
-    fn size(&self) -> usize {
-        (self.bottom_right.x - self.top_left.x) as usize * (self.bottom_right.y - self.top_left.y) as usize
-    }
+pub fn window(width: usize, height: usize) -> Window {
+    let (Window { id, inner }, clone) =
+        Window::new(WINDOW_ID.fetch_add(1, Ordering::Relaxed), width, height);
+    WINDOWS.write().as_mut().unwrap().insert(id, inner);
+    clone
+}
 
-    fn blend_buffers<P: Pixel>(
-        &self, 
-        src_fb: &Framebuffer<P>, 
-        dest_fb: &mut Framebuffer<P>,
-        dest_coord: Coord,
-        src_fb_row_range: Range<usize>,
-    ) -> Result<(), &'static str> {
-        let (dest_width, dest_height) = dest_fb.get_size();
-        let (src_width, src_height) = src_fb.get_size();
-
-        let start_y = core::cmp::max(src_fb_row_range.start as isize + dest_coord.y, self.top_left.y);
-        let end_y = core::cmp::min(src_fb_row_range.end as isize + dest_coord.y, self.bottom_right.y);
-
-        // skip if the updated part is not in the dest framebuffer
-        let dest_start = Coord::new(
-            core::cmp::max(0, self.top_left.x),
-            core::cmp::max(0, start_y)
+async fn compositor_loop(mut driver: GraphicsDriver<AlphaPixel>, mut channels: Channels) {
+    loop {
+        // log::info!("compositor looping");
+        // The select macro is not available in no_std.
+        futures::select_biased!(
+            request = channels.window.next() => {
+                let start = time::Instant::now();
+                let request = request.unwrap();
+                handle_window_request(&mut driver, request).await;
+            }
+            request = channels.keyboard.next() => {
+                let start = time::Instant::now();
+                let request = request.unwrap();
+                handle_keyboard_request(request);
+            }
+            request = channels.mouse.next() => {
+                let request = request.unwrap();
+                handle_mouse_request(request);
+            }
+            complete => panic!("compositor loop exited"),
         );
-
-        let dest_end = Coord::new(
-            core::cmp::min(dest_width as isize, self.bottom_right.x),
-            core::cmp::min(dest_height as isize, end_y)
-        );
-        if dest_end.x < 0
-            || dest_start.x > dest_width as isize
-            || dest_end.y < 0
-            || dest_start.y > dest_height as isize
-        {
-            return Ok(());
-        }
-                
-        // skip if the updated part is not in the source framebuffer
-        let coordinate_start = dest_start - dest_coord;
-        let coordinate_end = dest_end - dest_coord;
-        if coordinate_end.x < 0
-            || coordinate_start.x > src_width as isize
-            || coordinate_end.y < 0
-            || coordinate_start.y > src_height as isize
-        {
-            return Ok(());
-        }
-
-        let src_x_start = core::cmp::max(0, coordinate_start.x) as usize;
-        let src_y_start = core::cmp::max(0, coordinate_start.y) as usize;
-
-        // draw only the part within the dest buffer
-        let width = core::cmp::min(coordinate_end.x as usize, src_width) - src_x_start;
-        let height = core::cmp::min(coordinate_end.y as usize, src_height) - src_y_start;
-
-        // copy every line of the block to the dest framebuffer.
-        let src_buffer = &src_fb.buffer();
-        for i in 0..height {
-            let src_start = Coord::new(src_x_start as isize, (src_y_start + i) as isize);
-            let src_start_index = match src_fb.index_of(src_start) {
-                Some(index) => index,
-                None => {continue;}
-            };
-            let src_end_index = src_start_index + width;
-            let dest_start = src_start + dest_coord;
-            let dest_start_index =  match dest_fb.index_of(dest_start) {
-                Some(index) => index,
-                None => {continue;}
-            };
-            dest_fb.composite_buffer(&src_buffer[src_start_index..src_end_index], dest_start_index);
-        }
-
-        Ok(())
+        // log::info!("compositor looped");
     }
+}
+
+async fn handle_window_request(driver: &mut GraphicsDriver<AlphaPixel>, request: Request) {
+    let id = request.window_id;
+
+    let windows = WINDOWS.read();
+    let inner = windows.as_ref().unwrap().get(&id).cloned();
+    drop(windows);
+
+    // TODO: Take events out of inner (or at least out of Mutex).
+    let mut waker = None;
+
+    if let Some(inner) = inner {
+        if let Some(mut locked) = inner.locked.try_write() {
+            match request.ty {
+                RequestType::Refresh { dirty } => {
+                    // This will be true once we drop the lock.
+                    locked.is_unlocked = true;
+
+                    match &locked.waker {
+                        Some(w) => waker = Some(w.clone()),
+                        None => error!("no registered waker"),
+                    }
+
+                    refresh(driver, locked, dirty);
+                }
+            }
+        } else {
+            error!("window was locked");
+        }
+    } else {
+        error!("invalid window ID");
+    }
+
+    if let Some(waker) = waker {
+        waker.wake();
+    }
+}
+
+fn handle_keyboard_request(event: KeyEvent) {
+    if let Some(active_window) = active_window() {
+        if active_window
+            .events
+            .try_send(Event::Keyboard(event))
+            .is_err()
+        {
+            log::info!("dropping keyboard event");
+        }
+    }
+}
+
+fn handle_mouse_request(event: MouseEvent) {
+    if let Some(active_window) = active_window() {
+        if active_window.events.try_send(Event::Mouse(event)).is_err() {
+            log::info!("dropping mouse event");
+        }
+    }
+}
+
+fn active_window() -> Option<Arc<Inner>> {
+    // TODO: Get active window.
+    WINDOWS.read().as_ref().unwrap().get(&0).cloned()
 }

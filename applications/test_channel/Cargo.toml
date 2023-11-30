@@ -29,5 +29,5 @@ path = "../../kernel/spawn"
 [dependencies.rendezvous]
 path = "../../kernel/rendezvous"
 
-[dependencies.async_channel]
-path = "../../kernel/async_channel"
+[dependencies.mpmc_channel]
+path = "../../kernel/mpmc_channel"

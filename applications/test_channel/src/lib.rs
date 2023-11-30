@@ -9,7 +9,7 @@ extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate rendezvous;
-extern crate async_channel;
+extern crate mpmc_channel;
 extern crate cpu;
 
 
@@ -117,13 +117,13 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
     println!("Running rendezvous channel test in multiple mode.");
     rendezvous_test_multiple(send_count!(), receive_count!(), send_panic_point, receive_panic_point)?;
 
-    println!("Running asynchronous channel test in oneshot mode.");
+    println!("Running mpmc channel test in oneshot mode.");
     for _i in 0 .. iterations!() {
-        asynchronous_test_oneshot()?;
+        mpmc_test_oneshot()?;
     }
 
-    println!("Running asynchronous channel test in multiple mode.");
-    asynchronous_test_multiple(send_count!(), receive_count!(), send_panic_point, receive_panic_point)?;
+    println!("Running mpmc channel test in multiple mode.");
+    mpmc_test_multiple(send_count!(), receive_count!(), send_panic_point, receive_panic_point)?;
 
     Ok(())
 }
@@ -250,84 +250,84 @@ fn rendezvous_sender_task ((sender, iterations, panic_point): (rendezvous::Sende
 
 /// A simple test that spawns a sender & receiver task to send a single message
 /// Optionally can set panics at `send_panic` and `receive_panic` locations
-fn asynchronous_test_oneshot() -> Result<(), &'static str> {
+fn mpmc_test_oneshot() -> Result<(), &'static str> {
     let my_cpu = cpu::current_cpu();
 
-    let (sender, receiver) = async_channel::new_channel(2);
+    let (sender, receiver) = mpmc_channel::new_channel(2);
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("asynchronous_test_oneshot(): Entered sender task!");
+        warn!("mpmc_test_oneshot(): Entered sender task!");
         sender.send("hello").map_err(|error| {
             warn!("Sender task failed due to : {:?}", error);
             return "Sender task failed";
         })?;
         Ok(())
     }, ())
-        .name(String::from("sender_task_asynchronous_oneshot"))
+        .name(String::from("sender_task_mpmc_oneshot"))
         .block();
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("asynchronous_test_oneshot(): Entered receiver task!");
+        warn!("mpmc_test_oneshot(): Entered receiver task!");
         let msg = receiver.receive().map_err(|error| {
             warn!("Receiver task failed due to : {:?}", error);
             return "Receiver task failed"
         })?;
-        warn!("asynchronous_test_oneshot(): Receiver got msg: {:?}", msg);
+        warn!("mpmc_test_oneshot(): Receiver got msg: {:?}", msg);
         Ok(())
     }, ())
-        .name(String::from("receiver_task_asynchronous_oneshot"))
+        .name(String::from("receiver_task_mpmc_oneshot"))
         .block();
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
-    warn!("asynchronous_test_oneshot(): Finished spawning the sender and receiver tasks");
+    warn!("mpmc_test_oneshot(): Finished spawning the sender and receiver tasks");
     t2.unblock().unwrap();
     t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;
-    warn!("asynchronous_test_oneshot(): Joined the sender and receiver tasks.");
+    warn!("mpmc_test_oneshot(): Joined the sender and receiver tasks.");
     
     Ok(())
 }
 
 
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
-fn asynchronous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
+fn mpmc_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
     let my_cpu = cpu::current_cpu();
 
-    let (sender, receiver) = async_channel::new_channel(2);
+    let (sender, receiver) = mpmc_channel::new_channel(2);
 
-    let t1 = spawn::new_task_builder(asynchronous_sender_task, (sender, send_count, send_panic))
-        .name(String::from("sender_task_asynchronous"))
+    let t1 = spawn::new_task_builder(mpmc_sender_task, (sender, send_count, send_panic))
+        .name(String::from("sender_task_mpmc"))
         .block();
 
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = spawn::new_task_builder(asynchronous_receiver_task, (receiver, receive_count, receive_panic))
-        .name(String::from("receiver_task_asynchronous"))
+    let t2 = spawn::new_task_builder(mpmc_receiver_task, (receiver, receive_count, receive_panic))
+        .name(String::from("receiver_task_mpmc"))
         .block();
 
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
-    warn!("asynchronous_test_multiple(): Finished spawning the sender and receiver tasks");
+    warn!("mpmc_test_multiple(): Finished spawning the sender and receiver tasks");
     t2.unblock().unwrap();
     t1.unblock().unwrap();
 
     t1.join()?;
     t2.join()?;
-    warn!("asynchronous_test_multiple(): Joined the sender and receiver tasks.");
+    warn!("mpmc_test_multiple(): Joined the sender and receiver tasks.");
     
     Ok(())
 }
 
 /// A simple receiver receiving `iterations` messages
 /// Optionally may panic after sending `panic_pont` messages
-fn asynchronous_receiver_task ((receiver, iterations, panic_point): (async_channel::Receiver<String>, usize, Option<usize>)) -> Result<(), &'static str> {
-    warn!("asynchronous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
+fn mpmc_receiver_task ((receiver, iterations, panic_point): (mpmc_channel::Receiver<String>, usize, Option<usize>)) -> Result<(), &'static str> {
+    warn!("mpmc_test(): Entered receiver task! Expecting to receive {} messages", iterations);
     
     if panic_point.is_some(){
-        warn!("asynchronous_test(): Panic will occur in receiver task at message {}",panic_point.unwrap());
+        warn!("mpmc_test(): Panic will occur in receiver task at message {}",panic_point.unwrap());
     }
 
     for i in 0..iterations {
@@ -335,23 +335,23 @@ fn asynchronous_receiver_task ((receiver, iterations, panic_point): (async_chann
             warn!("Receiver task failed due to : {:?}", error);
             return "Receiver task failed"
         })?;
-        warn!("asynchronous_test(): Receiver got {:?}  ({:03})", msg, i);
+        warn!("mpmc_test(): Receiver got {:?}  ({:03})", msg, i);
 
         if panic_point == Some(i) {
             panic!("rendezvous_test() : User specified panic in receiver");
         }
     }
 
-    warn!("asynchronous_test(): Done receiver task!");
+    warn!("mpmc_test(): Done receiver task!");
     Ok(())
 }
 
 /// A simple sender sending `iterations` messages
 /// Optionally may panic after sending `panic_pont` messages
-fn asynchronous_sender_task ((sender, iterations, panic_point): (async_channel::Sender<String>, usize, Option<usize>)) -> Result<(), &'static str> {
-    warn!("asynchronous_test(): Entered sender task! Expecting to send {} messages", iterations);
+fn mpmc_sender_task ((sender, iterations, panic_point): (mpmc_channel::Sender<String>, usize, Option<usize>)) -> Result<(), &'static str> {
+    warn!("mpmc_test(): Entered sender task! Expecting to send {} messages", iterations);
     if panic_point.is_some(){
-        warn!("asynchronous_test(): Panic will occur in sender task at message {}",panic_point.unwrap());
+        warn!("mpmc_test(): Panic will occur in sender task at message {}",panic_point.unwrap());
     }
 
     for i in 0..iterations {
@@ -359,14 +359,14 @@ fn asynchronous_sender_task ((sender, iterations, panic_point): (async_channel::
             warn!("Sender task failed due to : {:?}", error);
             return "Sender task failed";
         })?;
-        warn!("asynchronous_test(): Sender sent message {:03}", i);
+        warn!("mpmc_test(): Sender sent message {:03}", i);
 
         if panic_point == Some(i) {
             panic!("rendezvous_test() : User specified panic in receiver");
         }
     }
 
-    warn!("asynchronous_test(): Done sender task!");
+    warn!("mpmc_test(): Done sender task!");
     Ok(())
 }
 

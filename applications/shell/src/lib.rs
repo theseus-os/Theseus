@@ -1,17 +1,14 @@
 //! Shell with event-driven architecture
 //! Commands that can be run are the names of the crates in the applications directory
-//! 
+//!
 //! The shell has the following responsibilities: handles key events delivered from terminal, manages terminal display,
 //! spawns and manages tasks, and records the history of executed user commands.
 
 #![no_std]
 extern crate keycodes_ascii;
 extern crate spin;
-extern crate dfqueue;
 extern crate spawn;
 extern crate task;
-extern crate event_types; 
-extern crate window_manager;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -25,14 +22,12 @@ extern crate libterm;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-use event_types::Event;
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use path::Path;
 use task::{ExitValue, KillReason, JoinableTaskRef};
-use libterm::Terminal;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use libterm::{Event, Terminal};
 use alloc::sync::Arc;
 use spin::Mutex;
 use environment::Environment;
@@ -98,7 +93,7 @@ pub fn main(_args: Vec<String>) -> isize {
             Err(err) => {
                 error!("{}", err);
                 error!("failed to spawn shell");
-                return -1; 
+                return -1;
             }
         };
     }
@@ -123,12 +118,12 @@ pub fn main(_args: Vec<String>) -> isize {
     // return 0;
 }
 
-/// Errors when attempting to invoke an application from the terminal. 
+/// Errors when attempting to invoke an application from the terminal.
 enum AppErr {
-    /// The command does not match the name of any existing application in the 
-    /// application namespace directory. 
+    /// The command does not match the name of any existing application in the
+    /// application namespace directory.
     NotFound(String),
-    /// The terminal could not find the application namespace due to a filesystem error. 
+    /// The terminal could not find the application namespace due to a filesystem error.
     NamespaceErr,
     /// The terminal could not spawn a new task to run the new application.
     /// Includes the String error returned from the task spawn function.
@@ -158,11 +153,6 @@ struct Shell {
     /// When someone enters some commands, but before pressing `enter` it presses `up` to see previous commands,
     /// we must push it to command_history. We don't want to push it twice.
     buffered_cmd_recorded: bool,
-    /// The consumer to the terminal's print dfqueue
-    print_consumer: DFQueueConsumer<Event>,
-    /// The producer to the terminal's print dfqueue
-    #[allow(dead_code)]
-    print_producer: DFQueueProducer<Event>,
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
@@ -173,13 +163,6 @@ impl Shell {
     /// Create a new shell. Currently the shell will bind to the default terminal instance provided
     /// by the `app_io` crate.
     fn new() -> Result<Shell, &'static str> {
-        // Initialize a dfqueue for the terminal object to handle printing from applications.
-        // Note that this is only to support legacy output. Newly developed applications should
-        // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
-        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
-        let print_consumer = terminal_print_dfq.into_consumer();
-        let print_producer = print_consumer.obtain_producer();
-
         let key_event_queue: KeyEventQueue = KeyEventQueue::new();
         let key_event_producer = key_event_queue.get_writer();
         let key_event_consumer = key_event_queue.get_reader();
@@ -199,15 +182,13 @@ impl Shell {
             command_history: Vec::new(),
             history_index: 0,
             buffered_cmd_recorded: false,
-            print_consumer,
-            print_producer,
             env: Arc::new(Mutex::new(env)),
             terminal
         })
     }
 
     /// Insert a character to the command line buffer in the shell.
-    /// The position to insert is determined by the position of the cursor in the terminal. 
+    /// The position to insert is determined by the position of the cursor in the terminal.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
@@ -237,7 +218,7 @@ impl Shell {
         if sync_terminal {
             self.terminal.lock().remove_char(cursor_offset_from_end)?;
         }
-        if !erase_left {            
+        if !erase_left {
             self.update_cursor_pos(cursor_offset_from_end - 1)?;
         }
         Ok(())
@@ -320,7 +301,7 @@ impl Shell {
             self.update_cursor_pos(offset_from_end - 1)?;
         }
         self.terminal.lock().cursor.enable();
-        
+
         Ok(())
     }
 
@@ -335,7 +316,7 @@ impl Shell {
             terminal.update_cursor_pos(offset_from_end, self.cmdline.as_bytes()[self.cmdline.len() - offset_from_end]);
         }
         terminal.cursor.enable();
-        
+
         Ok(())
     }
 
@@ -381,10 +362,10 @@ impl Shell {
         Ok(())
     }
 
-    fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {       
+    fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {
         // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
         if keyevent.action != KeyAction::Pressed {
-            return Ok(()); 
+            return Ok(());
         }
 
         // Ctrl+C signals the shell to exit the job
@@ -433,7 +414,7 @@ impl Shell {
                 self.redisplay_prompt();
                 return Ok(());
             }
-            
+
             return Ok(());
         }
 
@@ -501,7 +482,7 @@ impl Shell {
             return Ok(());
         }
 
-        // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
+        // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
             if cmdline.is_empty() && self.fg_job_num.is_none() {
@@ -550,7 +531,7 @@ impl Shell {
             return Ok(());
         }
 
-        // handle navigation keys: home, end, page up, page down, up arrow, down arrow 
+        // handle navigation keys: home, end, page up, page down, up arrow, down arrow
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.is_control() {
             return self.terminal.lock().move_screen_to_begin();
         }
@@ -636,7 +617,7 @@ impl Shell {
         let cmd_crate_name = format!("{cmd}-");
         let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
         let app_file = matching_apps.next();
-        let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
+        let second_match = matching_apps.next(); // return an error if there are multiple matching apps
         let app_path = app_file.xor(second_match)
             .map(|f| f.lock().get_absolute_path())
             .ok_or(AppErr::NotFound(cmd))?;
@@ -647,7 +628,7 @@ impl Shell {
             .block()
             .spawn()
             .map_err(|e| AppErr::SpawnErr(e.to_string()))?;
-        
+
         taskref.set_env(self.env.clone()); // Set environment variable of application to the same as terminal task
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
@@ -874,7 +855,7 @@ impl Shell {
 
         // Try to match the name of the file.
         let locked_working_dir = curr_wd.lock();
-        let mut child_list = locked_working_dir.list(); 
+        let mut child_list = locked_working_dir.list();
         child_list.reverse();
         for child in child_list.iter() {
             if child.starts_with(incomplete_node) {
@@ -1172,16 +1153,6 @@ impl Shell {
     fn check_and_print_app_output(&mut self) -> bool {
         let mut need_refresh = false;
 
-        // Support for legacy output by `terminal_print`.
-        if let Some(print_event) = self.print_consumer.peek() {
-            if let Event::OutputEvent(ref s) = print_event.deref() {
-                self.terminal.lock().print_to_terminal(s.clone());
-            }
-            print_event.mark_completed();
-            // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
-            need_refresh =  true;
-        }
-
         let mut buf: [u8; 256] = [0; 256];
 
         // iterate through all jobs to see if they have something to print
@@ -1228,15 +1199,15 @@ impl Shell {
 
     /// This main loop is the core component of the shell's event-driven architecture. The shell receives events
     /// from two queues
-    /// 
+    ///
     /// 1) The print queue handles print events from applications. The producer to this queue
     ///    is any EXTERNAL application that prints to the terminal.
-    /// 
+    ///
     /// 2) The input queue (provided by the window manager when the temrinal request a window) gives key events
     ///    and resize event to the application.
-    /// 
+    ///
     /// The print queue is handled first inside the loop iteration, which means that all print events in the print
-    /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
+    /// queue will always be printed to the text display before input events or any other managerial functions are handled.
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
     fn start(mut self) -> Result<(), &'static str> {
         let mut need_refresh = false;
@@ -1270,39 +1241,23 @@ impl Shell {
                 locked_terminal.get_event()
             } {
                 match ev {
-                    // Returns from the main loop.
-                    Event::ExitEvent => {
-                        trace!("exited terminal");
-                        return Ok(());
-                    }
-
-                    Event::WindowResizeEvent(new_position) => {
+                    Event::Resize(new_position) => {
                         self.terminal.lock().resize(new_position)?;
                         // the above function also refreshes the terminal display
                     }
 
                     // Handles ordinary keypresses
-                    Event::KeyboardEvent(ref input_event) => {
-                        self.key_event_producer.write_one(input_event.key_event);
+                    Event::Keyboard(input_event) => {
+                        self.key_event_producer.write_one(input_event);
                     }
-
-                    _unhandled => { 
+                    _unhandled => {
                         // trace!("Shell is ignoring unhandled event: {:?}", _unhandled);
                     }
                 };
-            }          
+            }
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
-            }
-
-            let is_active = {
-                let term = self.terminal.lock();
-                term.window.is_active()
-            };
-            
-            if is_active {
-                self.terminal.lock().display_cursor()?;
             }
 
             // handle inputs
@@ -1324,8 +1279,10 @@ impl Shell {
                 }
             }
             if need_refresh {
+                let start = time::Instant::now();
                 // update if there are inputs
                 self.terminal.lock().refresh_display()?;
+                log::info!("total took: {:?}", time::Instant::now().duration_since(start));
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }
