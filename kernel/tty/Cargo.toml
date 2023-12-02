@@ -6,7 +6,7 @@ description = "TTY abstractions"
 edition = "2021"
 
 [dependencies]
-async_channel = { path = "../async_channel" }
+sync_channel = { path = "../sync_channel" }
 sync_block = { path = "../sync_block" }
 
 [dependencies.core2]

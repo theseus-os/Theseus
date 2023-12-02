@@ -160,20 +160,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
-name = "async_channel"
-version = "0.1.0"
-dependencies = [
- "core2",
- "crossbeam-utils",
- "debugit",
- "log",
- "mpmc",
- "sync",
- "sync_spin",
- "wait_queue",
-]
-
-[[package]]
 name = "ata"
 version = "0.1.0"
 dependencies = [
@@ -320,7 +306,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "app_io",
- "async_channel",
  "cpu",
  "fs_node",
  "getopts",
@@ -336,6 +321,7 @@ dependencies = [
  "scheduler",
  "simple_ipc",
  "spawn",
+ "sync_channel",
  "task",
 ]
 
@@ -529,7 +515,6 @@ name = "console"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "async_channel",
  "core2",
  "hull",
  "io",
@@ -538,6 +523,7 @@ dependencies = [
  "path",
  "serial_port",
  "spawn",
+ "sync_channel",
  "sync_irq",
  "task",
  "tty",
@@ -3267,13 +3253,13 @@ dependencies = [
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "core2",
  "deferred_interrupt_tasks",
  "interrupts",
  "log",
  "serial_port_basic",
  "spin 0.9.4",
+ "sync_channel",
  "sync_irq",
 ]
 
@@ -3625,6 +3611,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync_channel"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "crossbeam-utils",
+ "debugit",
+ "log",
+ "mpmc",
+ "sync",
+ "sync_spin",
+ "wait_queue",
+]
+
+[[package]]
 name = "sync_irq"
 version = "0.1.0"
 dependencies = [
@@ -3763,7 +3763,6 @@ name = "test_channel"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "async_channel",
  "cpu",
  "getopts",
  "log",
@@ -3771,6 +3770,7 @@ dependencies = [
  "scheduler",
  "spawn",
  "spin 0.9.4",
+ "sync_channel",
  "task",
 ]
 
@@ -4128,9 +4128,9 @@ dependencies = [
 name = "tty"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "core2",
  "sync_block",
+ "sync_channel",
 ]
 
 [[package]]
@@ -4182,9 +4182,9 @@ checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
 name = "unified_channel"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "cfg-if 0.1.10",
  "rendezvous",
+ "sync_channel",
 ]
 
 [[package]]
