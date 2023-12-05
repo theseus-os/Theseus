@@ -39,8 +39,8 @@ use interrupts::{PL011_RX_SPI, init_pl011_rx_interrupt};
 
 // Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
-extern crate async_channel;
-use async_channel::Sender;
+extern crate sync_channel;
+use sync_channel::Sender;
 
 /// A temporary hack to allow the serial port interrupt handler
 /// to inform a listener on the other end of this channel
