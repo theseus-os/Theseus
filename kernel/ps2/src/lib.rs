@@ -309,7 +309,7 @@ impl<'c> PS2Mouse<'c> {
     /// Reset the mouse.
     pub fn reset(&self) -> Result<(), &'static str> {
         self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))?;
-        const VERY_ARBITRARY_TIMEOUT_VALUE: u16 = u16::MAX;
+        const VERY_ARBITRARY_TIMEOUT_VALUE: u32 = u16::MAX as u32 * 3;
         for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
             if let Ok(SelfTestPassed) = self.controller.read_data().try_into() { //not sure if we need to do this here, as command_to_mouse handles it on real hardware at least (same goes for keyboard reset)
                 //returns mouse id 0
@@ -476,7 +476,7 @@ impl<'c> PS2Keyboard<'c> {
         self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))?;
         // VirtualBox and presumably real hardware wants this. Qemu worked without this.
         // Sadly self.controller.polling_receive doesn't work here, either.
-        const VERY_ARBITRARY_TIMEOUT_VALUE: u16 = u16::MAX;
+        const VERY_ARBITRARY_TIMEOUT_VALUE: u32 = u16::MAX as u32 * 4;
         for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
             if let Ok(SelfTestPassed) = self.controller.read_data().try_into() {
                 return Ok(())
