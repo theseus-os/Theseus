@@ -36,7 +36,7 @@
 <a href="#36" id="36">36</a>
 <a href="#37" id="37">37</a>
 <a href="#38" id="38">38</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>async_channel::{Receiver, Sender};
+</pre></div><pre class="rust"><code><span class="kw">use </span>sync_channel::{Receiver, Sender};
 <span class="kw">use </span>core2::io::Result;
 
 <span class="attr">#[derive(Clone)]
@@ -47,7 +47,7 @@
 
 <span class="kw">impl </span>Channel {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span>(sender, receiver) = async_channel::new_channel(<span class="number">256</span>);
+        <span class="kw">let </span>(sender, receiver) = sync_channel::new_channel(<span class="number">256</span>);
         <span class="self">Self </span>{ sender, receiver }
     }
 

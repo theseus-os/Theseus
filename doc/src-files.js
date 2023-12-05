@@ -7,7 +7,6 @@ var srcIndex = JSON.parse('{\
 "apic":["",[],["lib.rs"]],\
 "app_io":["",[],["lib.rs"]],\
 "arm_boards":["",[],["lib.rs"]],\
-"async_channel":["",[],["lib.rs"]],\
 "ata":["",[],["lib.rs"]],\
 "atomic_linked_list":["",[],["atomic_linked_list.rs","atomic_map.rs","lib.rs"]],\
 "block_allocator":["",[],["lib.rs"]],\
@@ -157,6 +156,7 @@ var srcIndex = JSON.parse('{\
 "storage_manager":["",[],["lib.rs"]],\
 "str_ref":["",[],["lib.rs"]],\
 "sync_block":["",[],["condvar.rs","lib.rs"]],\
+"sync_channel":["",[],["lib.rs"]],\
 "sync_preemption":["",[],["lib.rs"]],\
 "task":["",[],["lib.rs","scheduler.rs"]],\
 "task_fs":["",[],["lib.rs"]],\

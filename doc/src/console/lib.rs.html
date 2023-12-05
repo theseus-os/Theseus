@@ -193,7 +193,7 @@
 </span><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>alloc::{format, sync::Arc};
-<span class="kw">use </span>async_channel::Receiver;
+<span class="kw">use </span>sync_channel::Receiver;
 <span class="kw">use </span>core::sync::atomic::{AtomicU16, Ordering};
 <span class="kw">use </span>core2::io::Write;
 <span class="kw">use </span>sync_irq::IrqSafeMutex;
@@ -219,7 +219,7 @@
 ///
 /// Returns the newly-spawned detection task.
 </span><span class="kw">pub fn </span>start_connection_detection() -&gt; <span class="prelude-ty">Result</span>&lt;JoinableTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>(sender, receiver) = async_channel::new_channel(<span class="number">4</span>);
+    <span class="kw">let </span>(sender, receiver) = sync_channel::new_channel(<span class="number">4</span>);
     serial_port::set_connection_listener(sender);
 
     spawn::new_task_builder(console_connection_detector, receiver)
@@ -257,7 +257,7 @@
             }
         };
 
-        <span class="kw">let </span>(sender, receiver) = async_channel::new_channel(<span class="number">16</span>);
+        <span class="kw">let </span>(sender, receiver) = sync_channel::new_channel(<span class="number">16</span>);
         <span class="kw">if </span>serial_port.lock().set_data_sender(sender).is_err() {
             <span class="macro">warn!</span>(
                 <span class="string">&quot;Serial port {:?} already had a data sender, skipping console connection request&quot;</span>,

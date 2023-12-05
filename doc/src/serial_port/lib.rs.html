@@ -453,8 +453,8 @@
 
 <span class="comment">// Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
-</span><span class="kw">extern crate </span>async_channel;
-<span class="kw">use </span>async_channel::Sender;
+</span><span class="kw">extern crate </span>sync_channel;
+<span class="kw">use </span>sync_channel::Sender;
 
 <span class="doccomment">/// A temporary hack to allow the serial port interrupt handler
 /// to inform a listener on the other end of this channel
