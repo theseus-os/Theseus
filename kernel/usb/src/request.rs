@@ -37,7 +37,7 @@ pub(crate) enum Request<'a> {
     SetDeviceDescriptor(descriptors::Device),
 
     GetConfigDescriptor(DescriptorIndex, &'a mut descriptors::Configuration),
-    SetConfigDescriptor(DescriptorIndex, descriptors::Configuration),
+    SetConfigDescriptor(DescriptorIndex, &'a descriptors::Configuration),
 
     GetConfiguration(&'a mut Option<NonZeroU8>),
     SetConfiguration(Option<NonZeroU8>),
@@ -249,7 +249,7 @@ impl<'a> Request<'a> {
             Request::GetDeviceDescriptor(_d) => shmem.descriptors.device.allocate(None),
             Request::SetDeviceDescriptor(d) => shmem.descriptors.device.allocate(Some(*d)),
             Request::GetConfigDescriptor(_desc_idx, _d) => shmem.descriptors.configuration.allocate(None),
-            Request::SetConfigDescriptor(_desc_idx, d) => shmem.descriptors.configuration.allocate(Some(*d)),
+            Request::SetConfigDescriptor(_desc_idx, d) => shmem.descriptors.configuration.allocate(Some(**d)),
             Request::GetConfiguration(_config) => shmem.bytes.allocate(None),
             Request::SetConfiguration(_config) => Ok(invalid_ptr_slot()),
             Request::GetInterfaceAltSetting(_interface_idx, _alt_setting) => shmem.bytes.allocate(None),
@@ -300,7 +300,7 @@ impl<'a> Request<'a> {
             Request::SetInterfaceAltSetting(_interface_idx, _alt_setting) => Ok(()),
             Request::ReadString(_string_idx, string) => {
                 let string_desc = &shmem.descriptors.string.free(shmem_index)?;
-                let str_len = string_desc.length.checked_sub(2).unwrap_or(0) as usize;
+                let str_len = string_desc.length.saturating_sub(2) as usize;
                 let slice = &string_desc.unicode_bytes[..str_len];
 
                 string.clear();

@@ -17,6 +17,9 @@
 #![no_std]
 #![allow(unused)]
 
+// The allocator macros sometime mess with clippy
+#![allow(clippy::needless_pub_self)]
+
 extern crate alloc;
 
 use memory::{MappedPages, BorrowedMappedPages, Mutable, PhysicalAddress, map_frame_range, create_identity_mapping, PAGE_SIZE, MMIO_FLAGS};
