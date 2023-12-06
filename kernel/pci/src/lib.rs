@@ -243,7 +243,7 @@ interrupt_handler!(pci_int_handler, None, _stack_frame, {
 /// Initializes the PCI interrupt handler
 pub fn init() -> Result<(), &'static str> {
     #[cfg(target_arch = "aarch64")]
-    init_pci_interrupts(pci_int_handler)?;
+    init_pci_interrupts([pci_int_handler; 4])?;
 
     Ok(())
 }
