@@ -5,7 +5,8 @@
 //! port-io is the legacy way to access the config space.
 //!
 //! For context on the various interrupt mechanisms (MSI/MSI-X/INTx):
-//! https://electronics.stackexchange.com/a/343218
+//! - [this StackExchange reply](https://electronics.stackexchange.com/a/343218)
+//! - PCI Express Base Specification, Revision 2, Chapter 6.1 - Interrupt & PME Support
 
 #![no_std]
 #![allow(dead_code)]
@@ -22,7 +23,6 @@ use volatile::Volatile;
 use zerocopy::FromBytes;
 use cpu::CpuId;
 use interrupts::InterruptNumber;
-use sync_irq::RwLock;
 
 #[cfg(target_arch = "x86_64")]
 use port_io::Port;
@@ -216,20 +216,20 @@ pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'s
     Ok(get_pci_buses()?.iter().flat_map(|b| b.devices.iter()))
 }
 
-static INTX_DEVICES: RwLock<Vec<&'static PciDevice>> = RwLock::new(Vec::new());
+static INTX_DEVICES: Mutex<Vec<&'static PciDevice>> = Mutex::new(Vec::new());
 
 // Architecture-independent PCI interrupt handler
-// Aarch64-only because legacy interrupts aren't supported on x86
+// Currently aarch64-only, because legacy interrupts aren't supported on x86 yet.
 #[cfg(target_arch = "aarch64")]
 interrupt_handler!(pci_int_handler, None, _stack_frame, {
-    let devices = INTX_DEVICES.read();
+    let devices = INTX_DEVICES.lock();
 
     for device in &*devices {
         if device.pci_get_interrupt_status(true) {
             device.pci_enable_interrupts(false);
             log::info!("Device {} triggered an interrupt", device.location);
 
-            let reader = device.interrupt_waker.read();
+            let reader = device.interrupt_waker.lock();
             match &*reader {
                 Some(waker) => waker.wake_by_ref(),
                 None => panic!("Device doesn't have an interrupt waker!"),
@@ -326,7 +326,7 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
                     location,
-                    interrupt_waker: RwLock::new(None),
+                    interrupt_waker: Mutex::new(None),
                 };
 
                 // disable legacy interrupts initially
@@ -637,7 +637,7 @@ pub struct PciDevice {
     pub location: PciLocation,
 
     /// The handling task for legacy PCI interrupts
-    pub interrupt_waker: RwLock<Option<Waker>>,
+    pub interrupt_waker: Mutex<Option<Waker>>,
 
     /// The class code, used to determine device type.
     pub class: u8,
@@ -895,15 +895,15 @@ impl PciDevice {
         ((!check_enabled) || interrupt_enabled()) && pending_interrupt()
     }
 
-    /// Sets a a task waker to be used when this device triggers an interrupt
+    /// Sets a task waker to be used when this device triggers an interrupt
     ///
     /// Returns the previous interrupt waker for this device, if there was one.
     pub fn set_interrupt_waker(&'static self, waker: Waker) -> Option<Waker> {
-        let mut handle = self.interrupt_waker.write();
+        let mut handle = self.interrupt_waker.lock();
         let prev_value = handle.replace(waker);
 
         if prev_value.is_none() {
-            let mut intx_devices = INTX_DEVICES.write();
+            let mut intx_devices = INTX_DEVICES.lock();
             intx_devices.push(self)
         }
 
