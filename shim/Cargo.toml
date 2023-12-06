@@ -1,0 +1,15 @@
+[package]
+name = "theseus-shim"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Declaration of shim functions for std linkage boundary"
+edition = "2021"
+
+[dependencies]
+alloc = { version = "1.0.0", optional = true, package = 'rustc-std-workspace-alloc' }
+compiler_builtins = { version = '0.1.103', optional = true }
+core = { version = "1.0.0", optional = true, package = 'rustc-std-workspace-core' }
+theseus_ffi = { path = "../libs/theseus_ffi" }
+
+[features]
+rustc-dep-of-std = ['alloc', 'compiler_builtins', 'core', 'theseus_ffi/rustc-dep-of-std']

@@ -132,3 +132,17 @@ fn oom(_layout: core::alloc::Layout) -> ! {
     error!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
     panic!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
 }
+
+// TODO: Are these truly unreachable?
+
+#[no_mangle]
+#[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn __rust_start_panic() {
+    unreachable!();
+}
+
+#[no_mangle]
+#[allow(clippy::missing_safety_doc, improper_ctypes_definitions)]
+pub unsafe extern "C" fn __rust_panic_cleanup(_: *mut u8) -> *mut (dyn core::any::Any + Send + 'static) {
+    unreachable!();
+}

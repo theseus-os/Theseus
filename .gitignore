@@ -42,3 +42,7 @@ github_pages/doc/
 
 # macOS directory stores
 /**/.DS_Store
+
+# TODO: Remove once std is upstreamed
+.cargo/
+/rust

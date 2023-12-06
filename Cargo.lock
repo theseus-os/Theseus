@@ -1832,6 +1832,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "libtheseus"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "core2",
+ "environment",
+ "path",
+ "random",
+ "task",
+ "theseus_ffi",
+ "thread_local_macro",
+]
+
+[[package]]
 name = "linked_list_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3867,6 +3881,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_std"
+version = "0.1.0"
+
+[[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
@@ -4021,6 +4039,7 @@ dependencies = [
  "test_preemption_counter",
  "test_restartable",
  "test_scheduler",
+ "test_std",
  "test_std_fs",
  "test_sync_block",
  "test_task_cancel",
@@ -4034,6 +4053,10 @@ dependencies = [
  "upd",
  "wasm",
 ]
+
+[[package]]
+name = "theseus_ffi"
+version = "0.1.0"
 
 [[package]]
 name = "theseus_std"
