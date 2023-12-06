@@ -20,7 +20,7 @@ extern crate sync_irq;
 extern crate serial_port_basic;
 
 use log::{Record, Level, Metadata, Log};
-use core::{borrow::Borrow, fmt::{self, Write}, ops::Deref};
+use core::{fmt::{self, Write}, ops::Deref};
 use sync_irq::IrqSafeMutex;
 use serial_port_basic::SerialPort;
 use alloc::{sync::Arc, vec::Vec};
@@ -210,7 +210,7 @@ impl DummyLogger {
     fn write_fmt(&self, arguments: fmt::Arguments) -> fmt::Result {
         if let Some(logger) = &*LOGGER.lock() {
             for writer in logger.writers.iter() {
-                let _ = writer.deref().borrow().lock().write_fmt(arguments);
+                let _ = writer.deref().lock().write_fmt(arguments);
             }
         } else {
             let _ = EARLY_LOGGER.lock().write_fmt(arguments);

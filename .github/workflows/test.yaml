@@ -2,6 +2,19 @@ name: QEMU Test
 on:
   pull_request:
     types: [synchronize, opened, reopened]
+    paths-ignore:
+      - 'book/**'
+      - 'c_test/**'
+      - 'docker/**'
+      - 'github_pages/**'
+      - 'old_crates/**'
+      - 'scripts/**'
+      - '.gitignore'
+      - 'LICENSE-MIT'
+      - 'README.md'
+      - 'bochsrc.txt'
+      - 'rustfmt.toml'
+      - 'slirp.conf'
 jobs:
   run-tests:
     runs-on: ubuntu-latest

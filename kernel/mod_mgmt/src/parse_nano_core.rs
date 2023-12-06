@@ -8,7 +8,7 @@
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
 use crate::{CrateNamespace, mp_range, CLS_SECTION_FLAG};
 use fs_node::FileRef;
-use path::Path;
+use path::PathBuf;
 use rustc_demangle::demangle;
 use spin::Mutex;
 use cow_arc::{CowArc, CowWeak};
@@ -78,7 +78,7 @@ pub fn parse_nano_core(
         CrateNamespace::get_crate_object_file_starting_with(namespace, NANO_CORE_FILENAME_PREFIX)
             .ok_or("couldn't find the expected \"nano_core\" kernel file")
     );
-    let nano_core_file_path = Path::new(nano_core_file.lock().get_absolute_path());
+    let nano_core_file_path = PathBuf::from(nano_core_file.lock().get_absolute_path());
     debug!(
         "parse_nano_core(): trying to load and parse the nano_core file: {:?}",
         nano_core_file_path

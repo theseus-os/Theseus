@@ -13,7 +13,6 @@ serial_port = { path = "../serial_port" }
 console = { path = "../console" }
 logger = { path = "../logger" }
 pci = { path = "../pci" }
-usb = { path = "../usb" }
 derive_more = "0.99.0"
 mpmc = "0.1.6"
 log = "0.4.8"

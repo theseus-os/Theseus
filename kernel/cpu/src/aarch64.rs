@@ -40,6 +40,11 @@ pub fn register_cpu(bootstrap: bool) -> Result<(), &'static str> {
     }
 }
 
+// Returns an iterator over the available CPUs.
+pub fn cpus() -> impl Iterator<Item = CpuId> {
+    ONLINE_CPUS.read().clone().into_iter()
+}
+
 /// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.
 pub fn cpu_count() -> u32 {

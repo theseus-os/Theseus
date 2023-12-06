@@ -23,9 +23,6 @@ path = "../../kernel/task"
 [dependencies.cpu]
 path = "../../kernel/cpu"
 
-[dependencies.runqueue]
-path = "../../kernel/runqueue"
-
 [dependencies.app_io]
 path = "../../kernel/app_io"
 

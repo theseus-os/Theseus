@@ -14,21 +14,10 @@
 #![no_std]
 #![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
-cfg_if::cfg_if! {
-    if #[cfg(epoch_scheduler)] {
-        extern crate scheduler_epoch as scheduler;
-    } else if #[cfg(priority_scheduler)] {
-        extern crate scheduler_priority as scheduler;
-    } else {
-        extern crate scheduler_round_robin as scheduler;
-    }
-}
-
 use interrupts::{self, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
-use task::{self, TaskRef};
 
-/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
-pub use task::schedule;
+/// Re-exports for convenience and legacy compatibility.
+pub use task::scheduler::{inherit_priority, priority, schedule, set_priority};
 
 
 /// Initializes the scheduler on this system using the policy set at compiler time.
@@ -41,8 +30,6 @@ pub use task::schedule;
 /// - `make THESEUS_CONFIG=epoch_scheduler`: epoch scheduler
 /// - `make THESEUS_CONFIG=priority_scheduler`: priority scheduler
 pub fn init() -> Result<(), &'static str> {
-    task::set_scheduler_policy(scheduler::select_next_task);
-
     #[cfg(target_arch = "x86_64")] {
         interrupts::register_interrupt(
             CPU_LOCAL_TIMER_IRQ,
@@ -54,16 +41,16 @@ pub fn init() -> Result<(), &'static str> {
     }
 
     #[cfg(target_arch = "aarch64")] {
-        interrupts::init_timer(timer_tick_handler)?;
-        interrupts::enable_timer(true);
+        interrupts::setup_timer_interrupt(timer_tick_handler)?;
+        generic_timer_aarch64::enable_timer_interrupt(true);
         Ok(())
     }
 }
 
 // Architecture-independent timer interrupt handler for preemptive scheduling.
-interrupt_handler!(timer_tick_handler, None, _stack_frame, {
+interrupt_handler!(timer_tick_handler, _, _stack_frame, {
     #[cfg(target_arch = "aarch64")]
-    interrupts::schedule_next_timer_tick();
+    generic_timer_aarch64::set_next_timer_interrupt(get_timeslice_ticks());
 
     // tick count, only used for debugging
     if false {
@@ -77,48 +64,29 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
     // in order to unblock any tasks that are done sleeping.
     sleep::unblock_sleeping_tasks();
 
-    // We must acknowledge the interrupt before the end of this handler
+    // We must acknowledge the interrupt *before* the end of this handler
     // because we switch tasks here, which doesn't return.
-    {
-        #[cfg(target_arch = "x86_64")]
-        eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
-
-        #[cfg(target_arch = "aarch64")]
-        eoi(CPU_LOCAL_TIMER_IRQ);
-    }
+    eoi(CPU_LOCAL_TIMER_IRQ);
 
     schedule();
 
     EoiBehaviour::HandlerSentEoi
 });
 
-/// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
-/// This function returns an error when a scheduler without priority is loaded. 
-pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
-    #[cfg(any(epoch_scheduler, priority_scheduler))]
-    {
-        Ok(scheduler::set_priority(_task, _priority))
-    }
-    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
-    {
-        Err("called set priority on scheduler that doesn't support set priority")
-    }
-}
 
-/// Returns the priority of a given task.
-/// This function returns None when a scheduler without priority is loaded.
-pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    #[cfg(any(epoch_scheduler, priority_scheduler))]
-    {
-        scheduler::get_priority(_task)
-    }
-    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
-    {
-        None
-    }
-}
+/// Returns the (cached) number of system timer ticks needed for the scheduling timeslice interval.
+///
+/// This is only needed on aarch64 because it only effectively offers a one-shot timer;
+/// x86_64 can be configured once as a recurring periodic timer.
+#[cfg(target_arch = "aarch64")]
+fn get_timeslice_ticks() -> u64 {
+    use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 
-pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
-    scheduler::inherit_priority(task)
+    static TIMESLICE_TICKS: spin::Once<u64> = spin::Once::new();
+
+    *TIMESLICE_TICKS.call_once(|| {
+        let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
+        let tick_period_femtosecs = generic_timer_aarch64::timer_period_femtoseconds();
+        timeslice_femtosecs / tick_period_femtosecs
+    })
 }

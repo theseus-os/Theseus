@@ -60,7 +60,7 @@ pub fn main(args: Vec<String>) -> isize {
                 else {" "} ;
 
             #[cfg(any(epoch_scheduler, priority_scheduler))] {
-                let priority = scheduler::get_priority(&task).map(|priority| format!("{}", priority)).unwrap_or_else(|| String::from("-"));
+                let priority = scheduler::priority(&task).map(|priority| format!("{}", priority)).unwrap_or_else(|| String::from("-"));
                 task_string.push_str(
                     &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}\n", 
                     id, runstate, cpu, pinned, task_type, priority, task.name)

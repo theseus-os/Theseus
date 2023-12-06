@@ -20,18 +20,13 @@ use {
 /// Performs early-stage initialization for simple devices needed during early boot.
 ///
 /// This includes:
-/// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
 #[cfg(target_arch = "x86_64")]
 pub fn early_init(
     rsdp_address: Option<PhysicalAddress>,
     kernel_mmi: &mut MemoryManagementInfo
 ) -> Result<(), &'static str> {
-    // First, initialize the local APIC hardware such that we can populate
-    // and initialize each LocalAPIC discovered in the ACPI table initialization routine below.
-    apic::init();
-    
-    // Then, parse the ACPI tables to acquire system configuration info.
+    // Parse the ACPI tables to acquire system configuration info.
     acpi::init(rsdp_address, &mut kernel_mmi.page_table)?;
 
     Ok(())
@@ -91,8 +86,6 @@ pub fn init(
     for dev in pci::pci_device_iter()? {
         debug!("Found PCI device: {:X?}", dev);
     }
-
-    // usb_controller::init();
 
     // store all the initialized ixgbe NICs here to be added to the network interface list
     // No NIC support on aarch64 at the moment

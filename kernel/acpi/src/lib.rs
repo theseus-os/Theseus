@@ -1,4 +1,4 @@
-//! Code to parse the ACPI tables, based off of Redox. 
+//! Code to parse the ACPI tables.
 #![no_std]
 
 extern crate alloc;
@@ -63,6 +63,17 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
         // here: do something with the DSDT here, when needed.
         // debug!("DSDT physical address: {:#X}", {_fadt.dsdt});
     }
+
+    // WAET is optional, and contains info about potentially optimizing timer-related actions.
+    {
+        let acpi_tables = ACPI_TABLES.lock();
+        if let Some(waet) = waet::Waet::get(&acpi_tables) {
+            // here: do something with the WAET here, if desired.
+            debug!("WAET: RTC? {:?}. ACPI PM timer? {:?}",
+                waet.rtc_good(), waet.acpi_pm_timer_good(),
+            );
+        }
+    }
     
     // HPET is optional, but usually present.
     {
@@ -75,13 +86,6 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
             warn!("This machine has no HPET.");
         }
     };
-    
-    // MADT is mandatory
-    {
-        let acpi_tables = ACPI_TABLES.lock();
-        let madt = madt::Madt::get(&acpi_tables).ok_or("The required MADT ACPI table wasn't found (signature 'APIC')")?;
-        madt.bsp_init(page_table)?;
-    }
 
     // If we have a DMAR table, use it to obtain IOMMU info. 
     {

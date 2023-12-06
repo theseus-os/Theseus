@@ -25,7 +25,7 @@ use serial_port::{SerialPort, SerialPortAddress, get_serial_port};
 
 
 pub fn main(args: Vec<String>) -> isize {
-    let serial_port_address = args.get(0)
+    let serial_port_address = args.first()
         .and_then(|s| SerialPortAddress::try_from(&**s).ok())
         .unwrap_or(SerialPortAddress::COM1);
 
