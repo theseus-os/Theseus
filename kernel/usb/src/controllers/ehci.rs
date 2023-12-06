@@ -246,7 +246,7 @@ impl ControllerApi for EhciController {
             log::error!("TODO: USB-EHCI interrupt: Async Advance");
         }
 
-        log::warn!("Done handling an USB interrupt\n{:#?}", self.op_regs.status.read());
+        // log::warn!("Done handling an USB interrupt\n{:#?}", self.op_regs.status.read());
 
         Ok(())
     }

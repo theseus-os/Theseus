@@ -145,6 +145,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary-int"
+version = "1.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe8e2a586ecd6eb29477a0c25b19742acca4fa5e39c92e127656616810c20579"
+
+[[package]]
 name = "arm_boards"
 version = "0.1.0"
 dependencies = [
@@ -240,6 +246,29 @@ name = "bare-metal"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fe8f5a8a398345e52358e18ff07cc17a568fbca5c6f73873d3a62056309603"
+
+[[package]]
+name = "bilge"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc707ed8ebf81de5cd6c7f48f54b4c8621760926cdf35a57000747c512e67b57"
+dependencies = [
+ "arbitrary-int",
+ "bilge-impl",
+]
+
+[[package]]
+name = "bilge-impl"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "feb11e002038ad243af39c2068c8a72bcf147acf05025dcdb916fcc000adb2d8"
+dependencies = [
+ "itertools 0.11.0",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.26",
+]
 
 [[package]]
 name = "bincode"
@@ -720,7 +749,7 @@ name = "crate_name_utils"
 version = "0.1.0"
 dependencies = [
  "crate_metadata",
- "itertools",
+ "itertools 0.7.11",
  "path",
 ]
 
@@ -885,7 +914,7 @@ dependencies = [
  "app_io",
  "crate_name_utils",
  "getopts",
- "itertools",
+ "itertools 0.7.11",
  "log",
  "memory",
  "mod_mgmt",
@@ -937,6 +966,7 @@ dependencies = [
  "serial_port",
  "spin 0.9.4",
  "storage_manager",
+ "usb",
 ]
 
 [[package]]
@@ -1691,6 +1721,15 @@ name = "itertools"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
 dependencies = [
  "either",
 ]
@@ -2507,7 +2546,7 @@ dependencies = [
  "http_client",
  "httparse",
  "irq_safety",
- "itertools",
+ "itertools 0.7.11",
  "log",
  "net",
  "percent-encoding",
@@ -3574,7 +3613,7 @@ dependencies = [
  "fs_node",
  "getopts",
  "hpet",
- "itertools",
+ "itertools 0.7.11",
  "memory",
  "mod_mgmt",
  "path",
@@ -4228,7 +4267,7 @@ dependencies = [
  "crate_swap",
  "fs_node",
  "getopts",
- "itertools",
+ "itertools 0.7.11",
  "memfs",
  "memory",
  "mod_mgmt",
@@ -4238,6 +4277,22 @@ dependencies = [
  "spin 0.9.4",
  "task",
  "vfs_node",
+]
+
+[[package]]
+name = "usb"
+version = "0.1.0"
+dependencies = [
+ "bilge",
+ "log",
+ "memory",
+ "pci",
+ "sleep",
+ "spawn",
+ "sync_irq",
+ "volatile 0.2.7",
+ "waker",
+ "zerocopy",
 ]
 
 [[package]]
