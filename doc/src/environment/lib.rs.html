@@ -91,6 +91,8 @@
 <a href="#91" id="91">91</a>
 <a href="#92" id="92">92</a>
 <a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -124,15 +126,17 @@
     <span class="doccomment">/// Changes the current working directory.
     </span><span class="attr">#[doc(alias(<span class="string">&quot;change&quot;</span>))]
     </span><span class="kw">pub fn </span>chdir(<span class="kw-2">&amp;mut </span><span class="self">self</span>, path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span>new_dir = <span class="self">self</span>.working_dir.lock().get(path.as_ref());
-        <span class="kw">match </span>new_dir {
-            <span class="prelude-val">Some</span>(FileOrDir::Dir(dir_ref)) =&gt; {
-                <span class="self">self</span>.working_dir = dir_ref;
-                <span class="prelude-val">Ok</span>(())
+        <span class="kw">for </span>component <span class="kw">in </span>path.components() {
+            <span class="kw">let </span>new = <span class="self">self</span>.working_dir.lock().get(component.as_ref());
+            <span class="kw">match </span>new {
+                <span class="prelude-val">Some</span>(FileOrDir::Dir(dir)) =&gt; {
+                    <span class="self">self</span>.working_dir = dir;
+                }
+                <span class="prelude-val">Some</span>(FileOrDir::File(<span class="kw">_</span>)) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(Error::NotADirectory),
+                <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(Error::NotFound),
             }
-            <span class="prelude-val">Some</span>(FileOrDir::File(<span class="kw">_</span>)) =&gt; <span class="prelude-val">Err</span>(Error::NotADirectory),
-            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(Error::NotFound),
         }
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">/// Returns the value of the environment variable with the given `key`.
