@@ -1273,6 +1273,8 @@
 <a href="#1273" id="1273">1273</a>
 <a href="#1274" id="1274">1274</a>
 <a href="#1275" id="1275">1275</a>
+<a href="#1276" id="1276">1276</a>
+<a href="#1277" id="1277">1277</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.
 //! 
 //! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. 
@@ -1619,8 +1621,10 @@
         <span class="comment">// enable msi-x interrupts if required and return the assigned interrupt numbers
         </span><span class="kw">let </span>interrupt_num =
             <span class="kw">if let </span><span class="prelude-val">Some</span>(interrupt_handlers) = interrupts {
-                ixgbe_pci_dev.pci_enable_msix()<span class="question-mark">?</span>;
-                ixgbe_pci_dev.pci_set_interrupt_disable_bit();
+                <span class="comment">// no need to disable legacy interrupts, it was done during device initialization.
+                // ixgbe_pci_dev.pci_set_interrupt_disable_bit(true);
+
+                </span>ixgbe_pci_dev.pci_enable_msix()<span class="question-mark">?</span>;
                 <span class="self">Self</span>::enable_msix_interrupts(<span class="kw-2">&amp;mut </span>mapped_registers1, <span class="kw-2">&amp;mut </span>rx_queues, <span class="kw-2">&amp;mut </span>vector_table, <span class="kw-2">&amp;</span>interrupt_handlers)<span class="question-mark">?
             </span>}
             <span class="kw">else </span>{

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["InterruptPin","PciCapability","PciConfigSpaceAccessMechanism"],"fn":["get_pci_buses","get_pci_device_bsf","pci_device_iter"],"struct":["MsixVectorEntry","MsixVectorTable","PciBus","PciDevice","PciLocation"]};
+window.SIDEBAR_ITEMS = {"enum":["InterruptPin","PciCapability","PciConfigSpaceAccessMechanism"],"fn":["get_pci_buses","get_pci_device_bsf","init","pci_device_iter"],"struct":["MsixVectorEntry","MsixVectorTable","PciBus","PciDevice","PciLocation"]};

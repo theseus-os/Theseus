@@ -286,16 +286,25 @@
 <a href="#286" id="286">286</a>
 <a href="#287" id="287">287</a>
 <a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 #![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(trait_alias))]
 
 </span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>log::{info, debug};
+<span class="kw">use </span>log::<span class="kw-2">*</span>;
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">use </span>{
-    log::{error, warn},
     mpmc::Queue,
     event_types::Event,
     memory::MemoryManagementInfo,
@@ -369,15 +378,16 @@
         mouse::init(ps2_controller.mouse_ref(), mouse_producer)<span class="question-mark">?</span>;
     }
 
+    pci::init()<span class="question-mark">?</span>;
+
     <span class="comment">// Initialize/scan the PCI bus to discover PCI devices
     </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter()<span class="question-mark">? </span>{
         <span class="macro">debug!</span>(<span class="string">&quot;Found PCI device: {:X?}&quot;</span>, dev);
     }
 
-    <span class="comment">// No NIC support on aarch64 at the moment
-    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
-
     <span class="comment">// store all the initialized ixgbe NICs here to be added to the network interface list
+    // No NIC support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">let </span><span class="kw-2">mut </span>ixgbe_devs = Vec::new();
 
     <span class="comment">// Iterate over all PCI devices and initialize the drivers for the devices we support.
@@ -389,6 +399,8 @@
         }
 
         <span class="comment">// If this is a storage device, initialize it as such.
+        // No storage device support on aarch64 at the moment
+        </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
         </span><span class="kw">match </span>storage_manager::init_device(dev) {
             <span class="comment">// Successfully initialized this storage device.
             </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(_storage_controller)) =&gt; <span class="kw">continue</span>,
@@ -405,6 +417,8 @@
 
         <span class="comment">// If this is a network device, initialize it as such.
         // Look for networking controllers, specifically ethernet cards
+        // No NIC support on aarch64 at the moment
+        </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
         </span><span class="kw">if </span>dev.class == <span class="number">0x02 </span>&amp;&amp; dev.subclass == <span class="number">0x00 </span>{
             <span class="kw">if </span>dev.vendor_id == e1000::INTEL_VEND &amp;&amp; dev.device_id == e1000::E1000_DEV {
                 <span class="macro">info!</span>(<span class="string">&quot;e1000 PCI device found at: {:?}&quot;</span>, dev.location);
@@ -455,18 +469,25 @@
     }
 
     <span class="comment">// Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.
-    </span><span class="kw">let </span>ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
-    <span class="kw">for </span>ixgbe_nic_ref <span class="kw">in </span>ixgbe_nics.iter() {
-        net::register_device(ixgbe_nic_ref);
+    // No NIC support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        <span class="kw">let </span>ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
+        <span class="kw">for </span>ixgbe_nic_ref <span class="kw">in </span>ixgbe_nics.iter() {
+            net::register_device(ixgbe_nic_ref);
+        }
     }
 
     <span class="comment">// Convenience notification for developers to inform them of no networking devices
+    // No NIC support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">if </span>net::get_default_interface().is_none() {
         <span class="macro">warn!</span>(<span class="string">&quot;Note: no network devices found on this system.&quot;</span>);
     }
 
     <span class="comment">// Discover filesystems from each storage device on the storage controllers initialized above
     // and mount each filesystem to the root directory by default.
+    // No storage device support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">if </span><span class="bool-val">false </span>{
         <span class="kw">for </span>storage_device <span class="kw">in </span>storage_manager::storage_devices() {
             <span class="kw">let </span>disk = fatfs_adapter::FatFsAdapter::new(
@@ -500,7 +521,6 @@
                 }
             }
         }
-    }
     }
 
     <span class="prelude-val">Ok</span>(())
