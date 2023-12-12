@@ -55,6 +55,9 @@ pub struct BoardConfig {
     // aarch64 manuals define the default timer IRQ number to be 30.
     pub cpu_local_timer_ppi: u8,
 
+    /// The IRQ numbers reserved for legacy PCI interrupts: INTA, INTB, INTC and INTD.
+    pub pci_intx: [u8; 4],
+
     pub pci_ecam: PciEcamConfig,
 }
 

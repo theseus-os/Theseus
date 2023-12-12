@@ -3,6 +3,10 @@
 //! Note: while pci currently uses port-io on x86 and mmio on aarch64,
 //! x86 may also support memory-based PCI configuration in the future;
 //! port-io is the legacy way to access the config space.
+//!
+//! For context on the various interrupt mechanisms (MSI/MSI-X/INTx):
+//! - [this StackExchange reply](https://electronics.stackexchange.com/a/343218)
+//! - PCI Express Base Specification, Revision 2, Chapter 6.1 - Interrupt & PME Support
 
 #![no_std]
 #![allow(dead_code)]
@@ -10,7 +14,7 @@
 extern crate alloc;
 
 use log::*;
-use core::{fmt, ops::{Deref, DerefMut}, mem::size_of};
+use core::{fmt, ops::{Deref, DerefMut}, mem::size_of, task::Waker};
 use alloc::vec::Vec;
 use spin::{Once, Mutex};
 use memory::{PhysicalAddress, BorrowedSliceMappedPages, Mutable, MappedPages, map_frame_range, MMIO_FLAGS};
@@ -24,7 +28,10 @@ use interrupts::InterruptNumber;
 use port_io::Port;
 
 #[cfg(target_arch = "aarch64")]
-use arm_boards::BOARD_CONFIG;
+use {
+    arm_boards::BOARD_CONFIG,
+    interrupts::{EoiBehaviour, interrupt_handler, init_pci_interrupts},
+};
 
 #[derive(Debug, Copy, Clone)]
 /// The span of bytes within a 4-byte chunk that a PCI register occupies.
@@ -121,6 +128,8 @@ pci_register!(PCI_INTERRUPT_PIN,       0x3D, 1);
 pci_register!(PCI_MIN_GRANT,           0x3E, 1);
 pci_register!(PCI_MAX_LATENCY,         0x3F, 1);
 
+const PCI_COMMAND_INT_DISABLED: u16 = 1 << 10;
+
 #[repr(u8)]
 pub enum PciCapability {
     Msi  = 0x05,
@@ -207,6 +216,37 @@ pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'s
     Ok(get_pci_buses()?.iter().flat_map(|b| b.devices.iter()))
 }
 
+static INTX_DEVICES: Mutex<Vec<&'static PciDevice>> = Mutex::new(Vec::new());
+
+// Architecture-independent PCI interrupt handler
+// Currently aarch64-only, because legacy interrupts aren't supported on x86 yet.
+#[cfg(target_arch = "aarch64")]
+interrupt_handler!(pci_int_handler, None, _stack_frame, {
+    let devices = INTX_DEVICES.lock();
+
+    for device in &*devices {
+        if device.pci_get_interrupt_status(true) {
+            device.pci_enable_interrupts(false);
+            log::info!("Device {} triggered an interrupt", device.location);
+
+            let reader = device.interrupt_waker.lock();
+            match &*reader {
+                Some(waker) => waker.wake_by_ref(),
+                None => log::error!("Device doesn't have an interrupt waker!"),
+            }
+        }
+    }
+
+    EoiBehaviour::HandlerDidNotSendEoi
+});
+
+/// Initializes the PCI interrupt handler
+pub fn init() -> Result<(), &'static str> {
+    #[cfg(target_arch = "aarch64")]
+    init_pci_interrupts([pci_int_handler; 4])?;
+
+    Ok(())
+}
 
 /// A PCI bus, which contains a list of PCI devices on that bus.
 #[derive(Debug)]
@@ -286,7 +326,11 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
                     location,
+                    interrupt_waker: Mutex::new(None),
                 };
+
+                // disable legacy interrupts initially
+                device.pci_enable_interrupts(false);
 
                 device_list.push(device);
             }
@@ -506,17 +550,20 @@ impl PciLocation {
     }
 
     /// Sets the PCI device's command bit 10 to disable legacy interrupts
-    pub fn pci_set_interrupt_disable_bit(&self) {
+    pub fn pci_set_interrupt_disable_bit(&self, bit: bool) {
         let command = self.pci_read_16(PCI_COMMAND);
-        trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
+        // trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
 
-        const INTERRUPT_DISABLE: u16 = 1 << 10;
-        self.pci_write_16(PCI_COMMAND, command | INTERRUPT_DISABLE);
+        let new_value = match bit {
+            true => command | PCI_COMMAND_INT_DISABLED,
+            false => command & !PCI_COMMAND_INT_DISABLED,
+        };
+        self.pci_write_16(PCI_COMMAND, new_value);
 
-        trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
+        /*trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
             self,
             self.pci_read_16(PCI_COMMAND),
-        );
+        );*/
     }
 
     /// Explores the PCI config space and returns address of requested capability, if present.
@@ -588,6 +635,9 @@ impl fmt::Debug for PciLocation {
 pub struct PciDevice {
     /// the bus, slot, and function number that locates this PCI device in the bus tree.
     pub location: PciLocation,
+
+    /// The handling task for legacy PCI interrupts
+    pub interrupt_waker: Mutex<Option<Waker>>,
 
     /// The class code, used to determine device type.
     pub class: u8,
@@ -828,6 +878,36 @@ impl PciDevice {
         };
 
         Ok((int_line, int_pin))
+    }
+
+    /// Enables/Disables legacy (INTx) interrupts for this device
+    pub fn pci_enable_interrupts(&self, enable: bool) {
+        self.pci_set_interrupt_disable_bit(!enable);
+    }
+
+    /// Reads and returns this PCI device's interrupt status flag.
+    pub fn pci_get_interrupt_status(&self, check_enabled: bool) -> bool {
+        const PCI_STATUS_INT: u16 = 1 << 3;
+
+        let interrupt_enabled = || (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0;
+        let pending_interrupt = || (self.pci_read_16(PCI_STATUS)  & PCI_STATUS_INT          ) != 0;
+
+        ((!check_enabled) || interrupt_enabled()) && pending_interrupt()
+    }
+
+    /// Sets a task waker to be used when this device triggers an interrupt
+    ///
+    /// Returns the previous interrupt waker for this device, if there was one.
+    pub fn set_interrupt_waker(&'static self, waker: Waker) -> Option<Waker> {
+        let mut handle = self.interrupt_waker.lock();
+        let prev_value = handle.replace(waker);
+
+        if prev_value.is_none() {
+            let mut intx_devices = INTX_DEVICES.lock();
+            intx_devices.push(self)
+        }
+
+        prev_value
     }
 }
 
