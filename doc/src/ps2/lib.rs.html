@@ -1133,6 +1133,24 @@
 <a href="#1133" id="1133">1133</a>
 <a href="#1134" id="1134">1134</a>
 <a href="#1135" id="1135">1135</a>
+<a href="#1136" id="1136">1136</a>
+<a href="#1137" id="1137">1137</a>
+<a href="#1138" id="1138">1138</a>
+<a href="#1139" id="1139">1139</a>
+<a href="#1140" id="1140">1140</a>
+<a href="#1141" id="1141">1141</a>
+<a href="#1142" id="1142">1142</a>
+<a href="#1143" id="1143">1143</a>
+<a href="#1144" id="1144">1144</a>
+<a href="#1145" id="1145">1145</a>
+<a href="#1146" id="1146">1146</a>
+<a href="#1147" id="1147">1147</a>
+<a href="#1148" id="1148">1148</a>
+<a href="#1149" id="1149">1149</a>
+<a href="#1150" id="1150">1150</a>
+<a href="#1151" id="1151">1151</a>
+<a href="#1152" id="1152">1152</a>
+<a href="#1153" id="1153">1153</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Driver for the PS/2 interface, which supports legacy keyboard and mouse devices.
 //!
 //! The [`init()`] function sets up the single system-wide [`PS2Controller`],
@@ -1185,9 +1203,13 @@
     }
 
     <span class="comment">// Here: the PS/2 Controller exists, so create the object representing it.
-    </span><span class="kw">let </span>controller = PS2Controller {
+    </span><span class="kw">let </span><span class="kw-2">mut </span>controller = PS2Controller {
         data_port: Mutex::new(Port::new(PS2Controller::PS2_DATA_PORT)),
-        command_and_status_port: Mutex::new(Port::new(PS2Controller::PS2_COMMAND_AND_STATUS_PORT))
+        command_and_status_port: Mutex::new(Port::new(
+            PS2Controller::PS2_COMMAND_AND_STATUS_PORT
+        )),
+        keyboard_attached: <span class="bool-val">false</span>,
+        mouse_attached: <span class="bool-val">false</span>,
     };
 
     <span class="comment">// Step 3: Disable Devices
@@ -1242,8 +1264,18 @@
     controller.write_config(config);
 
     <span class="comment">// Step 10: Reset Devices
-    </span>controller.keyboard_ref().reset()<span class="question-mark">?</span>;
-    controller.mouse_ref().reset()<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>keyboard_ref = PS2Keyboard::new(<span class="kw-2">&amp;</span>controller);
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = keyboard_ref.reset() {
+        <span class="macro">warn!</span>(<span class="string">&quot;couldn&#39;t reset the keyboard; assuming there is none: {e}&quot;</span>);
+    } <span class="kw">else </span>{
+        controller.keyboard_attached = <span class="bool-val">true</span>;
+    }
+    <span class="kw">let </span>mouse_ref = PS2Mouse::new(<span class="kw-2">&amp;</span>controller);
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mouse_ref.reset() {
+        <span class="macro">warn!</span>(<span class="string">&quot;couldn&#39;t reset the mouse; assuming there is none: {e}&quot;</span>);
+    } <span class="kw">else </span>{
+        controller.mouse_attached = <span class="bool-val">true</span>;
+    }
 
     <span class="macro">debug!</span>(<span class="string">&quot;Final PS/2 {:?}&quot;</span>, controller.read_config());
     
@@ -1257,6 +1289,10 @@
     </span>data_port: Mutex&lt;Port&lt;u8&gt;&gt;,
     <span class="doccomment">/// at 0x64
     </span>command_and_status_port: Mutex&lt;Port&lt;u8&gt;&gt;,
+    <span class="doccomment">/// whether a keyboard could be successfully detected
+    </span>keyboard_attached: bool,
+    <span class="doccomment">/// whether a mouse could be successfully detected
+    </span>mouse_attached: bool,
 }
 
 <span class="kw">impl </span>PS2Controller {
@@ -1268,15 +1304,15 @@
     <span class="doccomment">/// Returns a reference to the keyboard attached to this PS/2 controller.
     ///
     /// The keyboard only uses the data port.
-    </span><span class="kw">pub fn </span>keyboard_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Keyboard {
-        PS2Keyboard::new(<span class="self">self</span>)
+    </span><span class="kw">pub fn </span>keyboard_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;PS2Keyboard&gt; {
+        <span class="self">self</span>.keyboard_attached.then_some(PS2Keyboard::new(<span class="self">self</span>))
     }
 
     <span class="doccomment">/// Returns a reference to the mouse attached to this PS/2 controller.
     ///
     /// The mouse uses both the data port and the command/status port.
-    </span><span class="kw">pub fn </span>mouse_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Mouse {
-        PS2Mouse::new(<span class="self">self</span>)
+    </span><span class="kw">pub fn </span>mouse_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;PS2Mouse&gt; {
+        <span class="self">self</span>.mouse_attached.then_some(PS2Mouse::new(<span class="self">self</span>))
     }
 
     <span class="doccomment">/// Writes a command to the PS/2 command port.

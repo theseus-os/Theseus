@@ -296,6 +296,10 @@
 <a href="#296" id="296">296</a>
 <a href="#297" id="297">297</a>
 <a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 #![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(trait_alias))]
 
@@ -374,8 +378,12 @@
     <span class="comment">// PS/2 is x86_64 only
     </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
         <span class="kw">let </span>ps2_controller = ps2::init()<span class="question-mark">?</span>;
-        keyboard::init(ps2_controller.keyboard_ref(), key_producer)<span class="question-mark">?</span>;
-        mouse::init(ps2_controller.mouse_ref(), mouse_producer)<span class="question-mark">?</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(kb) = ps2_controller.keyboard_ref() {
+            keyboard::init(kb, key_producer)<span class="question-mark">?</span>;
+        }
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(m) = ps2_controller.mouse_ref() {
+            mouse::init(m, mouse_producer)<span class="question-mark">?</span>;
+        }
     }
 
     pci::init()<span class="question-mark">?</span>;
