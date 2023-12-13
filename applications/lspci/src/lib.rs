@@ -50,7 +50,7 @@ fn list_pci_devices() -> Result<(), &'static str> {
             }
         }
 
-        let (msi, msix) = dev.interrupt_support();
+        let (msi, msix) = dev.modern_interrupt_support();
         let supports = |b| match b {
             true => "supported",
             false => "not supported",

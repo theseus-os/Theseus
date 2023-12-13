@@ -748,7 +748,7 @@ impl PciDevice {
     ///
     /// - Returns `(true, _)` if the device supports MSI.
     /// - Returns `(_, true)` if the device supports MSI-X.
-    pub fn interrupt_support(&self) -> (bool, bool) {
+    pub fn modern_interrupt_support(&self) -> (bool, bool) {
         let msi = self.find_pci_capability(PciCapability::Msi).is_some();
         let msix = self.find_pci_capability(PciCapability::Msix).is_some();
 
