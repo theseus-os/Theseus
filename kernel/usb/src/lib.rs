@@ -51,8 +51,7 @@ static CONTROLLERS: RwLock<Vec<Mutex<Controller>>> = RwLock::new(Vec::new());
 
 /// Initializes a USB controllers connected via PCI
 pub fn init_pci(pci_dev: &'static PciDevice, ctrl_type: ControllerType) -> Result<(), &'static str> {
-    // get rid of interrupts while we're setting things up
-    pci_dev.pci_enable_interrupts(false);
+    // legacy interrupts are initially disabled
 
     let base = pci_dev.determine_mem_base(0)?;
     let mut controller = match ctrl_type {
@@ -77,17 +76,17 @@ pub fn init_pci(pci_dev: &'static PciDevice, ctrl_type: ControllerType) -> Resul
 fn pci_usb_int_task(params: (&'static PciDevice, usize)) -> ! {
     let (pci_dev, controller_index) = params;
     let (waker, blocker) = new_waker();
-    let _ = pci_dev.set_interrupt_waker(waker);
+    let _ = pci_dev.set_intx_waker(waker);
 
     loop {
-        pci_dev.pci_enable_interrupts(true);
+        pci_dev.pci_enable_intx(true);
         blocker.block();
         log::info!("Now handling an interrupt in pci_usb_int_task");
 
         let controllers = CONTROLLERS.read();
         let mut controller = controllers[controller_index].lock();
 
-        while pci_dev.pci_get_interrupt_status(false) {
+        while pci_dev.pci_get_intx_status(false) {
             controller.handle_interrupt().unwrap();
         }
     }

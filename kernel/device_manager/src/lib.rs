@@ -126,7 +126,7 @@ pub fn init(
             if dev.subclass == 0x03 {
                 // USB controller
                 // Note: only aarch64 is supported due to use of legacy PCI interrupts
-                #[cfg(target_arch = "aarch64")]
+                // #[cfg(target_arch = "aarch64")]
                 if dev.prog_if == 0x20 {
                     // EHCI
                     usb::init_pci(dev, usb::ControllerType::Ehci)?;
@@ -140,14 +140,16 @@ pub fn init(
         // No NIC support on aarch64 at the moment
         #[cfg(target_arch = "x86_64")]
         if dev.class == 0x02 && dev.subclass == 0x00 {
-            if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
-                info!("e1000 PCI device found at: {:?}", dev.location);
-                let nic = e1000::E1000Nic::init(dev)?;
-                let interface = net::register_device(nic);
-                nic.lock().init_interrupts(interface)?;
+            // The e1000 driver clashes with the USB driver
+            // if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
+            //     info!("e1000 PCI device found at: {:?}", dev.location);
+            //     let nic = e1000::E1000Nic::init(dev)?;
+            //     let interface = net::register_device(nic);
+            //     nic.lock().init_interrupts(interface)?;
+            //
+            //     continue;
+            // }
 
-                continue;
-            }
             if dev.vendor_id == ixgbe::INTEL_VEND && dev.device_id == ixgbe::INTEL_82599 {
                 info!("ixgbe PCI device found at: {:?}", dev.location);
                 
