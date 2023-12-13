@@ -7,8 +7,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 [dependencies]
 cfg-if = "0.1.6"
 
-[dependencies.async_channel]
-path = "../async_channel"
+[dependencies.sync_channel]
+path = "../sync_channel"
 
 [dependencies.rendezvous]
 path = "../rendezvous"

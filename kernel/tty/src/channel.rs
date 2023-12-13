@@ -1,4 +1,4 @@
-use async_channel::{Receiver, Sender};
+use sync_channel::{Receiver, Sender};
 use core2::io::Result;
 
 #[derive(Clone)]
@@ -9,7 +9,7 @@ pub(crate) struct Channel {
 
 impl Channel {
     pub(crate) fn new() -> Self {
-        let (sender, receiver) = async_channel::new_channel(256);
+        let (sender, receiver) = sync_channel::new_channel(256);
         Self { sender, receiver }
     }
 

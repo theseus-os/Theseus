@@ -1,8 +1,8 @@
-//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
+//! A blocking channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
 //! 
-//! This crate offers an asynchronous channel that allows multiple tasks
-//! to exchange messages through the use of a bounded-capacity intermediate buffer.
-//! Unlike the `rendezvous` channel, the sender and receiver do not need to rendezvous to send or receive data.
+//! This crate offers a blocking channel that allows multiple tasks to exchange messages through the
+//! use of a bounded-capacity intermediate buffer. Unlike the `rendezvous` channel, the sender and
+//! receiver do not need to rendezvous to send or receive data.
 //! 
 //! Only `Send` types can be sent or received through the channel.
 //! 
@@ -49,11 +49,11 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
     new_channel_with(minimum_capacity)
 }
 
-/// Creates a new asynchronous channel with the specified deadlock prevention method.
+/// Creates a new blocking channel with the specified deadlock prevention method.
 ///
 /// See [`new_channel()`] for more details.
 ///
-/// The asynchronous channel uses a wait queue internally and hence exposes a
+/// The blocking channel uses a wait queue internally and hence exposes a
 /// deadlock prevention type parameter `P` that is [`Spin`] by default.
 /// See [`WaitQueue`]'s documentation for more info on setting this type parameter.
 pub fn new_channel_with<T: Send, P: DeadlockPrevention>(
@@ -109,7 +109,7 @@ impl From<Error> for core2::io::Error {
 
 /// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.
 ///
-/// This struct is effectively a wrapper around a MPMC queue 
+/// This struct is effectively a wrapper around an MPMC queue
 /// with waitqueues for senders (producers) and receivers (consumers).
 /// 
 /// This channel object is not Send/Sync or cloneable itself;
@@ -184,7 +184,7 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
     /// otherwise returns an [`Error`]. 
     pub fn send(&self, msg: T) -> Result<(), Error> {
         #[cfg(trace_channel)]
-        trace!("async_channel: sending msg: {:?}", debugit!(msg));
+        trace!("sync_channel: sending msg: {:?}", debugit!(msg));
         // Fast path: attempt to send the message, assuming the buffer isn't full
         let msg = match self.try_send(msg) {
             // if successful return ok
@@ -365,7 +365,7 @@ impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
     /// 
     /// Returns the message if it was received properly, otherwise returns an [`Error`].
     pub fn receive(&self) -> Result<T, Error> {
-        // trace!("async_channel: receive() entry");
+        // trace!("sync_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
         // The code progresses beyond this match only if try_receive fails due to
         // empty channel
@@ -373,7 +373,7 @@ impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
             Err(Error::WouldBlock) => {},
             x => {
                 #[cfg(trace_channel)]
-                trace!("async_channel: received msg: {:?}", debugit!(x));
+                trace!("sync_channel: received msg: {:?}", debugit!(x));
                 return x;
             }
         };
@@ -408,12 +408,12 @@ impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
         // If we successfully received a message, we need to notify any waiting senders.
         // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
         if let Ok(ref _msg) = res {
-            // trace!("async_channel: successful receive() is notifying senders.");
+            // trace!("sync_channel: successful receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
         }
 
         #[cfg(trace_channel)]
-        trace!("async_channel: received msg: {:?}", debugit!(res));
+        trace!("sync_channel: received msg: {:?}", debugit!(res));
         
         res
     }

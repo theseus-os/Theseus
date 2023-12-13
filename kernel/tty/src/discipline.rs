@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::Channel;
 use alloc::vec::Vec;
-use async_channel::{new_channel, Receiver, Sender};
+use sync_channel::{new_channel, Receiver, Sender};
 use core2::io::Result;
 use sync_block::Mutex;
 

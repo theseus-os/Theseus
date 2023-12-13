@@ -31,15 +31,17 @@ impl Environment {
     /// Changes the current working directory.
     #[doc(alias("change"))]
     pub fn chdir(&mut self, path: &Path) -> Result<()> {
-        let new_dir = self.working_dir.lock().get(path.as_ref());
-        match new_dir {
-            Some(FileOrDir::Dir(dir_ref)) => {
-                self.working_dir = dir_ref;
-                Ok(())
+        for component in path.components() {
+            let new = self.working_dir.lock().get(component.as_ref());
+            match new {
+                Some(FileOrDir::Dir(dir)) => {
+                    self.working_dir = dir;
+                }
+                Some(FileOrDir::File(_)) => return Err(Error::NotADirectory),
+                None => return Err(Error::NotFound),
             }
-            Some(FileOrDir::File(_)) => Err(Error::NotADirectory),
-            None => Err(Error::NotFound),
         }
+        Ok(())
     }
 
     /// Returns the value of the environment variable with the given `key`.

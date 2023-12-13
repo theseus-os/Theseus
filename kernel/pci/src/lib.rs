@@ -232,7 +232,7 @@ interrupt_handler!(pci_int_handler, None, _stack_frame, {
             let reader = device.interrupt_waker.lock();
             match &*reader {
                 Some(waker) => waker.wake_by_ref(),
-                None => panic!("Device doesn't have an interrupt waker!"),
+                None => log::error!("Device doesn't have an interrupt waker!"),
             }
         }
     }
