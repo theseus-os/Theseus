@@ -156,7 +156,7 @@ impl E1000Nic {
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = match e1000_pci_dev.pci_get_interrupt_info() {
+        let interrupt_num = match e1000_pci_dev.pci_get_intx_info() {
             Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
             _ => return Err("e1000: PCI device had no interrupt number (IRQ vector)"),
         };
