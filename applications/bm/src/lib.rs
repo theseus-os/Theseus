@@ -1,4 +1,4 @@
-//! A collection of micro-benchmarks for Theseus. 
+//! A collection of micro-benchmarks for Theseus.
 //! They include null syscall, context switching, process creation, memory mapping, IPC and file system benchmarks.
 //! 
 //! To run the memory mapping benchmark, Theseus should be compiled with the "bm_map" configuration option.
@@ -23,7 +23,7 @@ extern crate scheduler;
 extern crate libtest;
 extern crate memory;
 extern crate rendezvous;
-extern crate async_channel;
+extern crate sync_channel;
 extern crate simple_ipc;
 extern crate getopts;
 extern crate pmu_x86;
@@ -89,10 +89,10 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("", "fs_delete", "file delete");
     opts.optflag("", "fs", "test code for checking FS' ability");
 
-    opts.optflag("a", "async", "Run IPC bm for the async channel");
+    opts.optflag("a", "sync", "Run IPC bm for the sync channel");
     opts.optflag("r", "rendezvous", "Run IPC bm for the rendezvous channel");
     opts.optflag("p", "pinned", "Sender and Receiver should be pinned to the same core in the IPC bm");
-    opts.optflag("b", "blocking", "Sender and Receiver should use blocking versions in the async IPC bm");
+    opts.optflag("b", "blocking", "Sender and Receiver should use blocking versions in the sync IPC bm");
     opts.optflag("c", "cycles", "Measure the IPC times in reference cycles (need to have a PMU for this option)");
 
 
@@ -101,7 +101,7 @@ pub fn main(args: Vec<String>) -> isize {
         Err(_f) => {
             println!("{}", _f);
             print_usage(opts);
-            return -1; 
+            return -1;
         }
     };
 
@@ -157,8 +157,8 @@ pub fn main(args: Vec<String>) -> isize {
 					println!("RENDEZVOUS IPC");
 					do_ipc_rendezvous(pinned, cycles)
 				} else if matches.opt_present("a") {
-					println!("ASYNC IPC");
-					do_ipc_async(pinned, blocking, cycles)
+					println!("SYNC IPC");
+					do_ipc_sync(pinned, blocking, cycles)
 				} else {
 					Err("Specify channel type to use")
 				}
@@ -196,8 +196,8 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 
-/// Measures the time for null syscall. 
-/// Calls `do_null_inner` multiple times and averages the value. 
+/// Measures the time for null syscall.
+/// Calls `do_null_inner` multiple times and averages the value.
 fn do_null() -> Result<(), &'static str> {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
@@ -216,7 +216,7 @@ fn do_null() -> Result<(), &'static str> {
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
-	
+
 	let lat = tries / TRIES as u64;
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
 	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
@@ -224,7 +224,7 @@ fn do_null() -> Result<(), &'static str> {
 		printlnwarn!("null_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
 	}
 	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
-	
+
 	printlninfo!("NULL result: ({})", T_UNIT);
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_syscall null` in LMBench");
@@ -232,7 +232,7 @@ fn do_null() -> Result<(), &'static str> {
 }
 
 /// Internal function that actually calculates the time for null syscall.
-/// Measures this by calling `get_my_current_task_id` of the current task. 
+/// Measures this by calling `get_my_current_task_id` of the current task.
 fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
@@ -263,12 +263,12 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static
 	Ok(delta_time_avg)
 }
 
-/// Measures the time to spawn an application. 
-/// Calls `do_spawn_inner` multiple times and averages the value. 
+/// Measures the time to spawn an application.
+/// Calls `do_spawn_inner` multiple times and averages the value.
 fn do_spawn() -> Result<(), &'static str>{
 	let child_core = match pick_free_core() {
-		Ok(child_core) => { 
-			printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
+		Ok(child_core) => {
+			printlninfo!("core_{} is idle, so my children will play on it.", child_core);
 			child_core
 		}
 		_ => {
@@ -284,7 +284,7 @@ fn do_spawn() -> Result<(), &'static str>{
 
 	let overhead_ct = hpet_timing_overhead()?;
 	print_header(TRIES, ITERATIONS);
-	
+
 	for i in 0..TRIES {
 		let lat = do_spawn_inner(overhead_ct, i+1, TRIES, child_core)?;
 
@@ -328,8 +328,8 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, on_cpu: CpuId) -> Resu
 		.ok_or("Could not find the application 'hello'")?;
 	let crate_name = crate_name_from_path(&app_path).ok_or("invalid app path")?.to_string();
 
-	// here we are taking the time at every iteration. 
-	// otherwise the crate is not fully unloaded from the namespace before the next iteration starts 
+	// here we are taking the time at every iteration.
+	// otherwise the crate is not fully unloaded from the namespace before the next iteration starts
 	// so it cannot be loaded again and we are returned an error.
 	let iterations = 100;
 	for _ in 0..iterations{
@@ -342,7 +342,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, on_cpu: CpuId) -> Resu
 
 	    child.join()?;
 	    end_hpet = hpet.get_counter();
-		delta_hpet += end_hpet - start_hpet - overhead_ct;		
+		delta_hpet += end_hpet - start_hpet - overhead_ct;
 	}
 
     let delta_time = hpet_2_time("", delta_hpet);
@@ -354,12 +354,12 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, on_cpu: CpuId) -> Resu
 }
 
 
-/// Measures the time to switch between two kernel threads. 
+/// Measures the time to switch between two kernel threads.
 /// Calls `do_ctx_inner` multiple times to perform the actual operation
 fn do_ctx() -> Result<(), &'static str> {
 	let child_core = match pick_free_core() {
-		Ok(child_core) => { 
-			printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
+		Ok(child_core) => {
+			printlninfo!("core_{} is idle, so my children will play on it.", child_core);
 			child_core
 		}
 		_ => {
@@ -372,12 +372,12 @@ fn do_ctx() -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	
+
 	print_header(TRIES, ITERATIONS*1000*2);
 
 	for i in 0..TRIES {
 		let lat = do_ctx_inner(i+1, TRIES, child_core)?;
-	
+
 		tries += lat;
 		vec.push(lat);
 
@@ -458,7 +458,7 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: CpuId) -> Result<u64, &'static
 	Ok(delta_time_avg)
 }
 
-/// Measures the time to create and destroy a mapping. 
+/// Measures the time to create and destroy a mapping.
 /// Calls `do_memory_map_inner` multiple times to perform the actual operation
 fn do_memory_map() -> Result<(), &'static str> {
 	let mut tries: u64 = 0;
@@ -478,7 +478,7 @@ fn do_memory_map() -> Result<(), &'static str> {
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
-	
+
 	let lat = tries / TRIES as u64;
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
 	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
@@ -486,7 +486,7 @@ fn do_memory_map() -> Result<(), &'static str> {
 		printlnwarn!("memory_map_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
 	}
 	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
-	
+
 	printlninfo!("MEMORY MAP result: ({})", T_UNIT);
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_mmap` in LMBench");
@@ -523,7 +523,7 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 	Ok(delta_time_avg)
 }
 
-/// Measures the round trip time to send a 1-byte message on a rendezvous channel. 
+/// Measures the round trip time to send a 1-byte message on a rendezvous channel.
 /// Calls `do_ipc_rendezvous_inner` multiple times to perform the actual operation
 fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
@@ -541,9 +541,9 @@ fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 
 	for i in 0..TRIES {
 		let lat = if cycles {
-			do_ipc_rendezvous_inner_cycles(i+1, TRIES, child_core)?	
+			do_ipc_rendezvous_inner_cycles(i+1, TRIES, child_core)?
 		} else {
-			do_ipc_rendezvous_inner(i+1, TRIES, child_core)?	
+			do_ipc_rendezvous_inner(i+1, TRIES, child_core)?
 		};
 		tries += lat;
 		vec.push(lat);
@@ -586,7 +586,7 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<CpuId>) -> R
 
 		let taskref3;
 
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
 				.pin_on_cpu(core)
@@ -596,7 +596,7 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<CpuId>) -> R
 				.name(String::from("overhead_task_1"))
 				.spawn()?;
 		}
-		
+
 		taskref3.join()?;
 
 	let overhead = hpet.get_counter();
@@ -604,11 +604,11 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<CpuId>) -> R
 		// we then create the sender and receiver endpoints for the 2 tasks
 		let (sender1, receiver1) = rendezvous::new_channel();
 		let (sender2, receiver2) = rendezvous::new_channel();
-		
+
 		let taskref1;
 
 		//then we spawn the child task
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
 				.name(String::from("sender"))
 				.pin_on_cpu(core)
@@ -651,7 +651,7 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId
 
 		let taskref3;
 
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
 				.pin_on_cpu(core)
@@ -661,7 +661,7 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId
 				.name(String::from("overhead_task_1"))
 				.spawn()?;
 		}
-		
+
 		taskref3.join()?;
 
 	let overhead = counter.diff();
@@ -670,11 +670,11 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId
 		// we then create the sender and receiver endpoints for the 2 tasks
 		let (sender1, receiver1) = rendezvous::new_channel();
 		let (sender2, receiver2) = rendezvous::new_channel();
-		
+
 		let taskref1;
 
 		//then we spawn the child task
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
 				.name(String::from("sender"))
 				.pin_on_cpu(core)
@@ -720,9 +720,9 @@ fn rendezvous_task_receiver((sender, receiver): (rendezvous::Sender<u8>, rendezv
     }
 }
 
-/// Measures the round trip time to send a 1-byte message on an async channel. 
-/// Calls `do_ipc_async_inner` multiple times to perform the actual operation
-fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'static str> {
+/// Measures the round trip time to send a 1-byte message on an sync channel.
+/// Calls `do_ipc_sync_inner` multiple times to perform the actual operation
+fn do_ipc_sync(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
 		Some(CPU_ID!())
 	} else {
@@ -738,9 +738,9 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 
 	for i in 0..TRIES {
 		let lat = if cycles {
-			do_ipc_async_inner_cycles(i+1, TRIES, child_core, blocking)?	
+			do_ipc_sync_inner_cycles(i+1, TRIES, child_core, blocking)?
 		} else {
-			do_ipc_async_inner(i+1, TRIES, child_core, blocking)?
+			do_ipc_sync_inner(i+1, TRIES, child_core, blocking)?
 		};
 		tries += lat;
 		vec.push(lat);
@@ -754,14 +754,14 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
 	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
 	if 	max - lat > err || lat - min > err {
-		printlnwarn!("ipc_async_test diff is too big: {} ({} - {})", max-min, max, min);
+		printlnwarn!("ipc_sync_test diff is too big: {} ({} - {})", max-min, max, min);
 	}
 	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
 
 	if cycles {
-		printlninfo!("IPC ASYNC result: Round Trip Time: (cycles)",);
+		printlninfo!("IPC SYNC result: Round Trip Time: (cycles)",);
 	} else {
-		printlninfo!("IPC ASYNC result: Round Trip Time: ({})", T_UNIT);
+		printlninfo!("IPC SYNC result: Round Trip Time: ({})", T_UNIT);
 	}
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_pipe` in LMBench when run with the pinned flag enabled");
@@ -772,13 +772,13 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
+fn do_ipc_sync_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
-	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
-		(async_task_sender, async_task_receiver)
+	let (sender_task, receiver_task): (fn((sync_channel::Sender<u8>, sync_channel::Receiver<u8>)), fn((sync_channel::Sender<u8>, sync_channel::Receiver<u8>))) = if blocking {
+		(sync_task_sender, sync_task_receiver)
 	} else {
-		(async_task_sender_nonblocking, async_task_receiver_nonblocking)
+		(sync_task_sender_nonblocking, sync_task_receiver_nonblocking)
 	};
 
 	// we first spawn one task to get the overhead of creating and joining the task
@@ -788,7 +788,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking:
 
 		let taskref3;
 
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
 				.pin_on_cpu(core)
@@ -798,7 +798,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking:
 				.name(String::from("overhead_task_1"))
 				.spawn()?;
 		}
-		
+
 		taskref3.join()?;
 
 	let overhead = hpet.get_counter();
@@ -808,12 +808,12 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking:
 		// which is 16 4 KiB-pages, or 65,536 bytes.
 		const CAPACITY: usize = 65536;
 
-		let (sender1, receiver1) = async_channel::new_channel(CAPACITY);
-		let (sender2, receiver2) = async_channel::new_channel(CAPACITY);
-		
+		let (sender1, receiver1) = sync_channel::new_channel(CAPACITY);
+		let (sender2, receiver2) = sync_channel::new_channel(CAPACITY);
+
 		let taskref1;
 
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
 				.name(String::from("sender"))
 				.pin_on_cpu(core)
@@ -845,14 +845,14 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking:
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
+fn do_ipc_sync_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
 	pmu_x86::init()?;
 	let mut counter = start_counting_reference_cycles()?;
 
-	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
-		(async_task_sender, async_task_receiver)
+	let (sender_task, receiver_task): (fn((sync_channel::Sender<u8>, sync_channel::Receiver<u8>)), fn((sync_channel::Sender<u8>, sync_channel::Receiver<u8>))) = if blocking {
+		(sync_task_sender, sync_task_receiver)
 	} else {
-		(async_task_sender_nonblocking, async_task_receiver_nonblocking)
+		(sync_task_sender_nonblocking, sync_task_receiver_nonblocking)
 	};
 
 	// we first spawn one task to get the overhead of creating and joining the task
@@ -862,7 +862,7 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, bl
 
 		let taskref3;
 
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
 				.pin_on_cpu(core)
@@ -872,7 +872,7 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, bl
 				.name(String::from("overhead_task_1"))
 				.spawn()?;
 		}
-		
+
 		taskref3.join()?;
 
 	let overhead = counter.diff();
@@ -883,12 +883,12 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, bl
 		// which is 16 4 KiB-pages, or 65,536 bytes.
 		const CAPACITY: usize = 65536;
 
-		let (sender1, receiver1) = async_channel::new_channel(CAPACITY);
-		let (sender2, receiver2) = async_channel::new_channel(CAPACITY);
-		
+		let (sender1, receiver1) = sync_channel::new_channel(CAPACITY);
+		let (sender2, receiver2) = sync_channel::new_channel(CAPACITY);
+
 		let taskref1;
 
-		if let Some(core) = child_core {		
+		if let Some(core) = child_core {
 			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
 				.name(String::from("sender"))
 				.pin_on_cpu(core)
@@ -916,25 +916,25 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, bl
 }
 
 /// A task which sends and then receives a message for a number of iterations
-fn async_task_sender((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn sync_task_sender((sender, receiver): (sync_channel::Sender<u8>, sync_channel::Receiver<u8>)) {
 	let mut msg = 0;
     for _ in 0..ITERATIONS{
-		sender.send(msg).expect("async channel task: could not send message!");
-        msg = receiver.receive().expect("async channel task: could not receive message");
+		sender.send(msg).expect("sync channel task: could not send message!");
+        msg = receiver.receive().expect("sync channel task: could not receive message");
     }
 }
 
 /// A task which receives and then sends a message for a number of iterations
-fn async_task_receiver((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn sync_task_receiver((sender, receiver): (sync_channel::Sender<u8>, sync_channel::Receiver<u8>)) {
 	let mut msg;
     for _ in 0..ITERATIONS{
-		msg = receiver.receive().expect("async channel task: could not receive message");
-		sender.send(msg).expect("async channel task: could not send message!");
+		msg = receiver.receive().expect("sync channel task: could not receive message");
+		sender.send(msg).expect("sync channel task: could not send message!");
     }
 }
 
 /// A task which sends and then receives a message for a number of iterations
-fn async_task_sender_nonblocking((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn sync_task_sender_nonblocking((sender, receiver): (sync_channel::Sender<u8>, sync_channel::Receiver<u8>)) {
 	let mut msg = Ok(0);
     for _ in 0..ITERATIONS{
 		while sender.try_send(*msg.as_ref().unwrap()).is_err() {}
@@ -946,7 +946,7 @@ fn async_task_sender_nonblocking((sender, receiver): (async_channel::Sender<u8>,
 }
 
 /// A task which receives and then sends a message for a number of iterations
-fn async_task_receiver_nonblocking((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+fn sync_task_receiver_nonblocking((sender, receiver): (sync_channel::Sender<u8>, sync_channel::Receiver<u8>)) {
 	let mut msg;
     for _ in 0..ITERATIONS{
 		msg = receiver.try_receive();
