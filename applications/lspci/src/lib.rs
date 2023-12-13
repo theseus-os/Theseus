@@ -39,8 +39,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn list_pci_devices() -> Result<(), &'static str> {
     for dev in pci_device_iter()? {
-        println!("{:04x}:{:04x}", dev.vendor_id, dev.device_id);
-        println!("- location: {}", dev.location);
+        println!("{} -- {:04x}:{:04x}", dev.location, dev.vendor_id, dev.device_id);
         println!("- class, subclass, prog_if: {:x}, {:x}, {:x}", dev.class, dev.subclass, dev.prog_if);
 
         for bar_idx in 0..6 {
@@ -59,8 +58,8 @@ fn list_pci_devices() -> Result<(), &'static str> {
 
         println!("- MSI interrupts: {}", supports(msi));
         println!("- MSI-X interrupts: {}", supports(msix));
-        println!("- INTx enabled: {}", dev.pci_interrupts_enabled());
-        println!("- INTx status: {}", dev.pci_get_interrupt_status(false));
+        println!("- INTx enabled: {}", dev.pci_intx_enabled());
+        println!("- INTx status: {}", dev.pci_get_intx_status(false));
     }
 
     Ok(())
