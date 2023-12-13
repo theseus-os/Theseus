@@ -76,8 +76,12 @@ pub fn init(
     // PS/2 is x86_64 only
     #[cfg(target_arch = "x86_64")] {
         let ps2_controller = ps2::init()?;
-        keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
-        mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
+        if let Some(kb) = ps2_controller.keyboard_ref() {
+            keyboard::init(kb, key_producer)?;
+        }
+        if let Some(m) = ps2_controller.mouse_ref() {
+            mouse::init(m, mouse_producer)?;
+        }
     }
 
     pci::init()?;

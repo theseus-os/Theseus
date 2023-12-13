@@ -50,9 +50,13 @@ pub fn init() -> Result<&'static PS2Controller, &'static str> {
     }
 
     // Here: the PS/2 Controller exists, so create the object representing it.
-    let controller = PS2Controller {
+    let mut controller = PS2Controller {
         data_port: Mutex::new(Port::new(PS2Controller::PS2_DATA_PORT)),
-        command_and_status_port: Mutex::new(Port::new(PS2Controller::PS2_COMMAND_AND_STATUS_PORT))
+        command_and_status_port: Mutex::new(Port::new(
+            PS2Controller::PS2_COMMAND_AND_STATUS_PORT
+        )),
+        keyboard_attached: false,
+        mouse_attached: false,
     };
 
     // Step 3: Disable Devices
@@ -107,8 +111,18 @@ pub fn init() -> Result<&'static PS2Controller, &'static str> {
     controller.write_config(config);
 
     // Step 10: Reset Devices
-    controller.keyboard_ref().reset()?;
-    controller.mouse_ref().reset()?;
+    let keyboard_ref = PS2Keyboard::new(&controller);
+    if let Err(e) = keyboard_ref.reset() {
+        warn!("couldn't reset the keyboard; assuming there is none: {e}");
+    } else {
+        controller.keyboard_attached = true;
+    }
+    let mouse_ref = PS2Mouse::new(&controller);
+    if let Err(e) = mouse_ref.reset() {
+        warn!("couldn't reset the mouse; assuming there is none: {e}");
+    } else {
+        controller.mouse_attached = true;
+    }
 
     debug!("Final PS/2 {:?}", controller.read_config());
     
@@ -122,6 +136,10 @@ pub struct PS2Controller {
     data_port: Mutex<Port<u8>>,
     /// at 0x64
     command_and_status_port: Mutex<Port<u8>>,
+    /// whether a keyboard could be successfully detected
+    keyboard_attached: bool,
+    /// whether a mouse could be successfully detected
+    mouse_attached: bool,
 }
 
 impl PS2Controller {
@@ -133,15 +151,15 @@ impl PS2Controller {
     /// Returns a reference to the keyboard attached to this PS/2 controller.
     ///
     /// The keyboard only uses the data port.
-    pub fn keyboard_ref(&self) -> PS2Keyboard {
-        PS2Keyboard::new(self)
+    pub fn keyboard_ref(&self) -> Option<PS2Keyboard> {
+        self.keyboard_attached.then_some(PS2Keyboard::new(self))
     }
 
     /// Returns a reference to the mouse attached to this PS/2 controller.
     ///
     /// The mouse uses both the data port and the command/status port.
-    pub fn mouse_ref(&self) -> PS2Mouse {
-        PS2Mouse::new(self)
+    pub fn mouse_ref(&self) -> Option<PS2Mouse> {
+        self.mouse_attached.then_some(PS2Mouse::new(self))
     }
 
     /// Writes a command to the PS/2 command port.
