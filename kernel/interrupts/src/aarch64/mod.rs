@@ -218,7 +218,7 @@ pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
 }
 
 /// Sets an interrupt handler for legacy PCI interrupts: INTA, INTB, INTC, INTD
-pub fn init_pci_interrupts(handlers: [InterruptHandler; 4]) -> Result<(), &'static str> {
+pub fn init_pci_intx(handlers: [InterruptHandler; 4]) -> Result<(), &'static str> {
     let int_ctrl = SystemInterruptController::get()
         .ok_or("SystemInterruptController was not yet initialized")?;
     let dst = Some(cpu::bootstrap_cpu().unwrap());
@@ -229,7 +229,7 @@ pub fn init_pci_interrupts(handlers: [InterruptHandler; 4]) -> Result<(), &'stat
     for (int_num, handler) in pci_intx_nums.zip(pci_intx_handlers) {
         if let Err(existing_handler) = register_interrupt(int_num, handler) {
             if handler as InterruptHandler != existing_handler {
-                return Err("A different interrupt handler has already been setup for that PCI interrupt");
+                return Err("A different interrupt handler has already been setup for that legacy PCI interrupt");
             }
         }
 
