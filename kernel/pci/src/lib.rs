@@ -744,6 +744,17 @@ impl PciDevice {
         mem_size
     }
 
+    /// Detectes MSI/MSI-X support on this device
+    ///
+    /// - Returns `(true, _)` if the device supports MSI.
+    /// - Returns `(_, true)` if the device supports MSI-X.
+    pub fn modern_interrupt_support(&self) -> (bool, bool) {
+        let msi = self.find_pci_capability(PciCapability::Msi).is_some();
+        let msix = self.find_pci_capability(PciCapability::Msix).is_some();
+
+        (msi, msix)
+    }
+
     /// Enable MSI interrupts for a PCI device.
     /// We assume the device only supports one MSI vector 
     /// and set the interrupt number and core id for that vector.
@@ -898,14 +909,17 @@ impl PciDevice {
         self.pci_set_intx_disable_bit(!enable);
     }
 
+    /// Checks that legacy interrupts are enabled in the command register.
+    pub fn pci_intx_enabled(&self) -> bool {
+        (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0
+    }
+
     /// Reads and returns this PCI device's legacy interrupt status flag.
     pub fn pci_get_intx_status(&self, check_enabled: bool) -> bool {
         const PCI_STATUS_INT: u16 = 1 << 3;
+        let pending_interrupt = || (self.pci_read_16(PCI_STATUS) & PCI_STATUS_INT) != 0;
 
-        let interrupt_enabled = || (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0;
-        let pending_interrupt = || (self.pci_read_16(PCI_STATUS)  & PCI_STATUS_INT          ) != 0;
-
-        ((!check_enabled) || interrupt_enabled()) && pending_interrupt()
+        ((!check_enabled) || self.pci_intx_enabled()) && pending_interrupt()
     }
 
     /// Sets a task waker to be used when this device triggers a legacy interrupt
