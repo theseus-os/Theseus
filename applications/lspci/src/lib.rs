@@ -50,14 +50,14 @@ fn list_pci_devices() -> Result<(), &'static str> {
             }
         }
 
-        let (msi, msix) = dev.modern_interrupt_support();
+        let support = dev.modern_interrupt_support();
         let supports = |b| match b {
             true => "supported",
             false => "not supported",
         };
 
-        println!("- MSI interrupts: {}", supports(msi));
-        println!("- MSI-X interrupts: {}", supports(msix));
+        println!("- MSI interrupts: {}", supports(support.msi));
+        println!("- MSI-X interrupts: {}", supports(support.msix));
         println!("- INTx enabled: {}", dev.pci_intx_enabled());
         println!("- INTx status: {}", dev.pci_get_intx_status(false));
     }
