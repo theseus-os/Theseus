@@ -4,16 +4,16 @@
 //!
 //! This crate deals with multiple types of interrupts:
 //! * Legacy (INTx) interrupts are the oldest PCI interrupt representation.
-//!   Four interrupt pins are shared among all devices.
-//!   This crate refers to that by "intx".
+//!   * Four interrupt pins are shared among all devices.
+//!   * This crate refers to these legacy interrupts as "intx".
 //!
 //! * MSI (Message Signaled Interrupts) appeared with PCI express.
-//!   They allow devices to allocate up to 32 interrupt numbers.
-//!   This crate refers to that by "msi".
+//!   * They allow devices to allocate up to 32 interrupt numbers.
+//!   * This crate refers to these interrupts as "msi".
 //!
 //! * MSI-X messages appeared with PCIe 3.0.
-//!   They allow devices to allocate up to 2048 interrupt numbers.
-//!   This crate refers to that by "msix".
+//!   * They allow devices to allocate up to 2048 interrupt numbers.
+//!   * This crate refers to these interrupts as "msix".
 //!
 //! Note: while pci currently uses port-io on x86 and mmio on aarch64,
 //! x86 may also support memory-based PCI configuration in the future;
@@ -638,6 +638,13 @@ impl fmt::Debug for PciLocation {
     }
 }
 
+/// Returned by [`PciDevice::modern_interrupt_support`]
+pub struct ModernInterruptSupport {
+    /// `true` if this device supports MSI (Message Signaled Interrupts)
+    pub msi: bool,
+    /// `true` if this device supports MSI-X
+    pub msix: bool,
+}
 
 /// Contains information common to every type of PCI Device,
 /// and offers functions for reading/writing to the PCI configuration space.
@@ -745,14 +752,11 @@ impl PciDevice {
     }
 
     /// Detectes MSI/MSI-X support on this device
-    ///
-    /// - Returns `(true, _)` if the device supports MSI.
-    /// - Returns `(_, true)` if the device supports MSI-X.
-    pub fn modern_interrupt_support(&self) -> (bool, bool) {
-        let msi = self.find_pci_capability(PciCapability::Msi).is_some();
-        let msix = self.find_pci_capability(PciCapability::Msix).is_some();
-
-        (msi, msix)
+    pub fn modern_interrupt_support(&self) -> ModernInterruptSupport {
+        ModernInterruptSupport { 
+            msi: self.find_pci_capability(PciCapability::Msi).is_some(),
+            msix: self.find_pci_capability(PciCapability::Msix).is_some(),
+        }
     }
 
     /// Enable MSI interrupts for a PCI device.
