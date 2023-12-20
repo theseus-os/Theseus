@@ -268,10 +268,10 @@ macro_rules! intx_handler {
     };
 }
 
-intx_handler!(pci_intx_handler_1, 1);
-intx_handler!(pci_intx_handler_2, 2);
-intx_handler!(pci_intx_handler_3, 3);
-intx_handler!(pci_intx_handler_4, 4);
+intx_handler!(pci_intx_handler_1, 0);
+intx_handler!(pci_intx_handler_2, 1);
+intx_handler!(pci_intx_handler_3, 2);
+intx_handler!(pci_intx_handler_4, 3);
 
 static HANDLERS: [InterruptHandler; 4] = [pci_intx_handler_1, pci_intx_handler_2, pci_intx_handler_3, pci_intx_handler_4];
 
