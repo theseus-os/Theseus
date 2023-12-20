@@ -1,7 +1,7 @@
 //! The aarch64-specific definitions of PTE flags.
 
 use crate::PteFlags;
-use bitflags::bitflags;
+use bilge::bilge;
 
 /// A mask for the bits of a page table entry that contain the physical frame address.
 pub const PTE_FRAME_MASK: u64 = 0x0000_FFFF_FFFF_F000;
@@ -9,187 +9,164 @@ pub const PTE_FRAME_MASK: u64 = 0x0000_FFFF_FFFF_F000;
 // Ensure that we never expose reserved bits [12:47] as part of the `PteFlagsAarch64` interface.
 const _: () = assert!(PteFlagsAarch64::all().bits() & PTE_FRAME_MASK == 0);
 
-bitflags! {
-    /// Page table entry (PTE) flags on aarch64.
+/// Page table entry (PTE) flags on aarch64.
+///
+/// **Note:** items beginning with an underscore `_` are not used in Theseus.
+///
+/// The designation of bits in each `PageTableEntry` is as such:
+/// * Bits `[0:11]` (inclusive) are reserved by hardware for access flags, cacheability flags,
+///   shareability flags, and TLB storage flags.
+/// * Bits `[12:47]` (inclusive) are reserved by hardware to hold the physical frame address.
+/// * Bits `[48:49]` (inclusive) are reserved as zero.
+/// * Bits `[50:54]` (inclusive) are reserved by hardware for more access flags.
+/// * Bits `[55:58]` (inclusive) are available for custom OS usage.
+/// * Bits `[59:63]` (inclusive) are reserved by hardware for extended access flags.
+///
+///
+/// ## Assumed System Configuration
+/// * The system has been configured to use 48-bit physical addresses
+///   (aka "OA"s: Output Addresses).
+/// * The system has been configured to use only a single translation stage, Stage 1.
+/// * The [MAIR] index 0 has a Normal + Outer Shareable entry.
+/// * The [MAIR] index 1 has a "DEVICE nGnRE" entry.
+///
+/// [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
+#[bitsize(64)]
+#[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
+struct PteFlagsAarch64 {
+    /// * If set, this page is currently "present" in memory. 
+    /// * If not set, this page is not in memory, which could mean one of several things:
+    ///   * The page is not mapped at all
+    ///   * The page has been temporarily paged/swapped to disk
+    ///   * The page is waiting to be mapped, i.e., for demand paging.
+    valid: bool,
+
+    descriptor_type: DescriptorType,
+
+    /// Indicates which MAIR register describes this page's cacheability.
+    mair_index: MairIndex,
+
+    /// * If set, this page is accessible in both Secure and Non-Secure execution levels.
+    /// * If not set, this page is accessible in only Secure execution levels.
+    _non_secure_access: bool,
+
+    /// * If set, userspace (unprivileged mode) can access this page.
+    /// * If not set, only kernelspace (privileged mode) can access this page.
+    _user_accessible: bool,
+
+    /// * If set, this page is read-only.
+    /// * If not set, this page is writable.
+    read_only: bool,
+
+    shareability: Shareability,
+
+    /// * The hardware will set this bit when the page is accessed.
+    /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
+    ///   if it cares at all about this information.
+    /// 
+    /// On aarch64, an "Access Flag Fault" may be raised if this bit is not set
+    /// when this page is first accessed and is trying to be cached in the TLB.
+    /// This fault can only occur when the Access Flag bit is `0` and the flag is being
+    /// managed by software.
     ///
-    /// **Note:** items beginning with an underscore `_` are not used in Theseus.
+    /// Thus, Theseus currently *always* sets this bit by default.
+    accessed: bool,
+
+    /// * If set, this page is mapped into only one or less than all address spaces,
+    ///   or is mapped differently across different address spaces,
+    ///   and thus be flushed out of the TLB when switching address spaces (page tables).
+    /// * If not set, this page is mapped identically across all address spaces
+    ///   (all root page tables) and doesn't need to be flushed out of the TLB
+    ///   when switching to another address space (page table).
     ///
-    /// The designation of bits in each `PageTableEntry` is as such:
-    /// * Bits `[0:11]` (inclusive) are reserved by hardware for access flags, cacheability flags,
-    ///   shareability flags, and TLB storage flags.
-    /// * Bits `[12:47]` (inclusive) are reserved by hardware to hold the physical frame address.
-    /// * Bits `[48:49]` (inclusive) are reserved as zero.
-    /// * Bits `[50:54]` (inclusive) are reserved by hardware for more access flags.
-    /// * Bits `[55:58]` (inclusive) are available for custom OS usage.
-    /// * Bits `[59:63]` (inclusive) are reserved by hardware for extended access flags.
+    /// Note: Theseus is a single address space system, so this flag makes no difference.
+    _not_global: bool,
+
+    /// Bits `[12:47]` (inclusive) of the physical frame address
+    phys_addr: u36,
+
+    // reserved, zero
+    reserved: u2,
+
+    /// * If set, this page is considered a "Guarded Page",
+    ///   which can be used to protect against executing instructions
+    ///   that aren't the intended target of a branch (e.g., with `BTI` instruction).
+    /// 
+    /// This is only available if `FEAT_BTI` is implemented;
+    /// otherwise it is reserved as 0.
+    _guarded_page: bool,
+
+    /// * The hardware will set this bit when the page has been written to.
+    /// * The OS can then clear this bit once it has acknowledged that the page was written to,
+    ///   which is primarily useful for paging/swapping to disk.
+    dirty: bool,
+
+    /// * If set, this translation table entry is part of a set that is contiguous in memory
+    ///   with adjacent entries that also have this bit set.
+    /// * If not set, this translation table entry is not contiguous in memory
+    ///   with entries that are adjancent to it.
     ///
-    ///
-    /// ## Assumed System Configuration
-    /// * The system has been configured to use 48-bit physical addresses
-    ///   (aka "OA"s: Output Addresses).
-    /// * The system has been configured to use only a single translation stage, Stage 1.
-    /// * The [MAIR] index 0 has a Normal + Outer Shareable entry.
-    /// * The [MAIR] index 1 has a "DEVICE nGnRE" entry.
-    ///
-    /// [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
-    #[doc(cfg(target_arch = "aarch64"))]
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub struct PteFlagsAarch64: u64 {
-        /// * If set, this page is currently "present" in memory. 
-        /// * If not set, this page is not in memory, which could mean one of several things:
-        ///   * The page is not mapped at all
-        ///   * The page has been temporarily paged/swapped to disk
-        ///   * The page is waiting to be mapped, i.e., for demand paging.
-        const VALID              = 1 << 0;
+    /// This is useful for reducing TLB pressure because the TLB entries for
+    /// multiple contiguous adjacent entries can be combined into one TLB entry.
+    _contiguous: bool,
 
-        /// * If set, this represents a page descriptor.
-        /// * If not set, this represents a block descriptor.
-        const PAGE_DESCRIPTOR    = 1 << 1;
+    executability: Executability,
 
-        /// Indicates the page's cacheability is described by MAIR Index 0.
-        ///
-        /// Theseus uses this index for "normal" memory.
-        const _MAIR_INDEX_0      = 0 << 2;
-        /// This page maps "normal" memory, i.e., non-device memory.
-        ///
-        /// Theseus uses `MAIR_INDEX_0` for this type of memory.
-        const NORMAL_MEMORY      = Self::_MAIR_INDEX_0.bits();
-        /// Indicates the page's cacheability is described by MAIR Index 1.
-        ///
-        /// Theseus uses this index for "device" memory.
-        const _MAIR_INDEX_1      = 1 << 2;
-        /// This page maps device memory, i.e., memory-mapped I/O registers.
-        ///
-        /// Theseus uses `MAIR_INDEX_1` for this type of memory.
-        const DEVICE_MEMORY      = Self::_MAIR_INDEX_1.bits();
-        /// Indicates the page's cacheability is described by MAIR Index 2.
-        ///
-        /// This is unused in Theseus.
-        const _MAIR_INDEX_2      = 2 << 2;
-        /// Indicates the page's cacheability is described by MAIR Index 3.
-        ///
-        /// This is unused in Theseus.
-        const _MAIR_INDEX_3      = 3 << 2;
-        /// Indicates the page's cacheability is described by MAIR Index 4.
-        ///
-        /// This is unused in Theseus.
-        const _MAIR_INDEX_4      = 4 << 2;
-        /// Indicates the page's cacheability is described by MAIR Index 5.
-        ///
-        /// This is unused in Theseus.
-        const _MAIR_INDEX_5      = 5 << 2;
-        /// Indicates the page's cacheability is described by MAIR Index 6.
-        ///
-        /// This is unused in Theseus.
-        const _MAIR_INDEX_6      = 6 << 2;
-        /// Indicates the page's cacheability is described by MAIR Index 7.
-        ///
-        /// This is unused in Theseus.
-        const _MAIR_INDEX_7      = 7 << 2;
+    /// See [PteFlags::EXCLUSIVE].
+    ///  We use bit 55 because it is available for custom OS usage on both x86_64 and aarch64.
+    exclusive: bool,
 
-        /// * If set, this page is accessible in both Secure and Non-Secure execution levels.
-        /// * If not set, this page is accessible in only Secure execution levels.
-        /// 
-        /// This is unused in Theseus.
-        const _NON_SECURE_ACCESS = 1 << 5;
+    // unused software bits
+    reserved: u3,
 
-        /// * If set, userspace (unprivileged mode) can access this page.
-        /// * If not set, only kernelspace (privileged mode) can access this page.
-        ///
-        /// This is unused in Theseus because it is a single privilege level OS.
-        const _USER_ACCESSIBLE   = 1 << 6;
-
-        /// * If set, this page is read-only.
-        /// * If not set, this page is writable.
-        const READ_ONLY          = 1 << 7;
-
-        /// Indicates that only a single CPU core may access this page.
-        ///
-        /// This is not used and not supported by Theseus; use [`Self::OUTER_SHAREABLE`].
-        const _NON_SHAREABLE     = 0 << 8;
-        // Shareable `0b01` is reserved.
-        // const SHAREABLE_RSVD  = 1 << 8;
-        /// Indicates that multiple CPUs from multiple clusters may access this page.
-        ///
-        /// This is the default and the the only value used in Theseus (and most systems).
-        const OUTER_SHAREABLE    = 2 << 8;
-        /// Multiple cores from the same
-        /// cluster can access this page.
-        /// Indicates that multiple CPUs from only a single cluster may access this page.
-        ///
-        /// This is not used and not supported by Theseus; use [`Self::OUTER_SHAREABLE`].
-        const _INNER_SHAREABLE   = 3 << 8;
-
-        /// * The hardware will set this bit when the page is accessed.
-        /// * The OS can then clear this bit once it has acknowledged that the page was accessed,
-        ///   if it cares at all about this information.
-        /// 
-        /// On aarch64, an "Access Flag Fault" may be raised if this bit is not set
-        /// when this page is first accessed and is trying to be cached in the TLB.
-        /// This fault can only occur when the Access Flag bit is `0` and the flag is being
-        /// managed by software.
-        ///
-        /// Thus, Theseus currently *always* sets this bit by default.
-        const ACCESSED           = 1 << 10;
-
-        /// * If set, this page is mapped into only one or less than all address spaces,
-        ///   or is mapped differently across different address spaces,
-        ///   and thus be flushed out of the TLB when switching address spaces (page tables).
-        /// * If not set, this page is mapped identically across all address spaces
-        ///   (all root page tables) and doesn't need to be flushed out of the TLB
-        ///   when switching to another address space (page table).
-        ///
-        /// Note: Theseus is a single address space system, so this flag makes no difference.
-        const _NOT_GLOBAL        = 1 << 11;
-
-        /// * If set, this page is considered a "Guarded Page",
-        ///   which can be used to protect against executing instructions
-        ///   that aren't the intended target of a branch (e.g., with `BTI` instruction).
-        /// 
-        /// This is only available if `FEAT_BTI` is implemented;
-        /// otherwise it is reserved as 0.
-        ///
-        /// This is currently not used in Theseus.
-        const _GUARDED_PAGE      = 1 << 50;
-
-        /// * The hardware will set this bit when the page has been written to.
-        /// * The OS can then clear this bit once it has acknowledged that the page was written to,
-        ///   which is primarily useful for paging/swapping to disk.
-        const DIRTY              = 1 << 51;
-
-        /// * If set, this translation table entry is part of a set that is contiguous in memory
-        ///   with adjacent entries that also have this bit set.
-        /// * If not set, this translation table entry is not contiguous in memory
-        ///   with entries that are adjancent to it.
-        ///
-        /// This is useful for reducing TLB pressure because the TLB entries for
-        /// multiple contiguous adjacent entries can be combined into one TLB entry.
-        ///
-        /// This is currently not used in Theseus.
-        const _CONTIGUOUS        = 1 << 52;
-
-        /// * If set, this page is not executable by privileged levels (kernel).
-        /// * If not set, this page is executable by privileged levels (kernel).
-        ///
-        /// In Theseus, use [`Self::NOT_EXECUTABLE`] instead.
-        const _PRIV_EXEC_NEVER   = 1 << 53;
-        /// * If set, this page is not executable by unprivileged levels (user).
-        /// * If not set, this page is executable by unprivileged levels (user).
-        ///
-        /// In Theseus, use [`Self::NOT_EXECUTABLE`] instead.
-        const _USER_EXEC_NEVER   = 1 << 54;
-        /// * If set, this page is not executable.
-        /// * If not set, this page is executable.
-        const NOT_EXECUTABLE     = Self::_PRIV_EXEC_NEVER.bits() | Self::_USER_EXEC_NEVER.bits();
-
-        /// See [PteFlags::EXCLUSIVE].
-        ///  We use bit 55 because it is available for custom OS usage on both x86_64 and aarch64.
-        const EXCLUSIVE          = 1 << 55;
-    }
+    // more hardware bits
+    reserved: u5,
 }
 
-const SHAREABLE_BITS_MASK: PteFlagsAarch64 = PteFlagsAarch64::_INNER_SHAREABLE;
-const MAIR_BITS_MASK:      PteFlagsAarch64 = PteFlagsAarch64::_MAIR_INDEX_7;
+#[bitsize(1)]
+#[derive(Debug, FromBits)]
+enum DescriptorType {
+    /// This descriptor maps a single page to a single frame
+    BlockDescriptor = 0,
+    /// This descriptor maps a block of virtual memory to a
+    /// block of physical memory (bigger than a page)
+    PageDescriptor = 1,
+}
+
+#[bitsize(3)]
+#[derive(Debug, FromBits)]
+enum MairIndex {
+    Normal = 0,
+    Device = 1,
+    #[fallback]
+    Reserved = 7,
+}
+
+#[bitsize(2)]
+#[derive(Debug, FromBits)]
+enum Shareability {
+    /// Only a single CPU core may access this page.
+    NonShareable = 0,
+    /// Indicates that multiple CPUs from multiple clusters may access this page.
+    OuterShareable = 2,
+    /// Indicates that multiple CPUs from only a single cluster may access this page.
+    InnerShareable = 3,
+    #[fallback]
+    Reserved = 1,
+}
+
+#[bitsize(2)]
+#[derive(Debug, FromBits)]
+enum Executability {
+    /// Both userspace and privileged contexts can execute code in this page
+    AlwaysExecutable = 0,
+    /// Only userspace context can execute code in this page
+    UserExecutable = 1,
+    /// Only privileged context can execute code in this page
+    PrivExecutable = 2,
+    /// No context can execute code in this page
+    NeverExecutable = 3,
+}
 
 /// See [`PteFlagsAarch64::new()`] for what bits are set by default.
 impl Default for PteFlagsAarch64 {
