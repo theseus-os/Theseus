@@ -38,18 +38,18 @@ use bit_field::BitField;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use cpu::CpuId;
-use interrupts::{InterruptNumber, InterruptHandler, interrupt_handler, EoiBehaviour};
+use interrupts::{InterruptNumber, InterruptHandler, interrupt_handler, register_interrupt, EoiBehaviour};
 
 #[cfg(target_arch = "x86_64")]
 use {
     port_io::Port,
-    interrupts::{IRQ_BASE_OFFSET, register_interrupt},
+    interrupts::IRQ_BASE_OFFSET,
 };
 
 #[cfg(target_arch = "aarch64")]
 use {
     arm_boards::BOARD_CONFIG,
-    interrupts::init_pci_intx,
+    interrupt_controller::{SystemInterruptController, SystemInterruptControllerApi},
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -236,12 +236,9 @@ pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'s
 }
 
 static INTX_DEVICES: Mutex<Vec<&'static PciDevice>> = Mutex::new(Vec::new());
-
-#[cfg(target_arch = "x86_64")]
 static INTX_NUMBERS: Mutex<[Option<InterruptNumber>; 4]> = Mutex::new([None; 4]);
 
 // Architecture-independent INTx handlers
-
 macro_rules! intx_handler {
     ($name:ident, $num:literal) => {
         interrupt_handler!($name, {
@@ -275,17 +272,37 @@ intx_handler!(pci_intx_handler_4, 3);
 
 static HANDLERS: [InterruptHandler; 4] = [pci_intx_handler_1, pci_intx_handler_2, pci_intx_handler_3, pci_intx_handler_4];
 
-/// Initializes the INTx handler
-pub fn init() -> Result<(), &'static str> {
-    #[cfg(target_arch = "aarch64")]
-    init_pci_intx(HANDLERS)?;
+pub fn init_intx_handler(int_num: InterruptNumber) -> Result<(), &'static str> {
+    let mut intx_numbers = INTX_NUMBERS.lock();
+    let mut slot = None;
 
-    // On x86 we don't properly query the ACPI tables to know
-    // which interrupt numbers are used for legacy PCI interrupts.
-    // As a workaround, we lazily register these handlers when
-    // a driver calls `PciDevice::set_intx_waker`, as by that time
-    // we're sure that the interrupt number in the device's config
-    // space is correct.
+    for i in 0..4 {
+        if intx_numbers[i] == Some(int_num) {
+            return Ok((/* this interrupt number was already initialized. */));
+        } else if intx_numbers[i].is_none() {
+            slot = Some(i);
+        }
+    }
+
+    let slot = slot.ok_or("More than four different INTx numbers were encountered")?;
+    intx_numbers[slot] = Some(int_num);
+    core::mem::drop(intx_numbers);
+
+    let pci_intx_handler = HANDLERS[slot];
+    if let Err(existing_handler) = register_interrupt(int_num, pci_intx_handler) {
+        if existing_handler != (pci_intx_handler as _) {
+            return Err("Couldn't lazily set PCI INTx handler");
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")] {
+        let int_dst = Some(cpu::bootstrap_cpu().unwrap());
+        let int_ctrl = SystemInterruptController::get()
+            .ok_or("SystemInterruptController was not yet initialized")?;
+
+        // route interrupt to bootstrap processor
+        int_ctrl.set_destination(int_num, int_dst, u8::MAX)?;
+    }
 
     Ok(())
 }
@@ -950,47 +967,29 @@ impl PciDevice {
         ((!check_enabled) || self.pci_intx_enabled()) && pending_interrupt()
     }
 
-    // On x86 we don't properly query the ACPI tables in `init` to know
-    // which interrupt numbers are used for legacy PCI interrupts.
-    // As a workaround, we lazily register these handlers when a driver
-    // calls `PciDevice::set_intx_waker`, as by that time we're sure that
-    // the interrupt number in the device's config space is correct.
-    #[cfg(target_arch = "x86_64")]
-    fn x86_lazy_intx_registration(&self) {
-        let int_num = match self.pci_get_intx_info() {
-            Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
-            _ => panic!("Cannot use INTx on device {:?}: No INTx info", self),
-        };
-
-        let mut intx_numbers = INTX_NUMBERS.lock();
-        let mut slot = None;
-
-        for i in 0..4 {
-            if intx_numbers[i] == Some(int_num) {
-                return /* this interrupt number was already initialized. */;
-            } else if intx_numbers[i].is_none() {
-                slot = Some(i);
-            }
-        }
-
-        let slot = slot.expect("More than four different INTx numbers were encountered");
-        intx_numbers[slot] = Some(int_num);
-        core::mem::drop(intx_numbers);
-
-        let pci_intx_handler = HANDLERS[slot];
-        if let Err(existing_handler) = register_interrupt(int_num, pci_intx_handler) {
-            if existing_handler != (pci_intx_handler as usize) {
-                panic!("Couldn't set PCI INTx handler for device: {:?}", self);
-            }
-        }
-    }
-
     /// Sets a task waker to be used when this device triggers a legacy interrupt
     ///
     /// Returns the previous interrupt waker for this device, if there was one.
-    pub fn set_intx_waker(&'static self, waker: Waker) -> Option<Waker> {
-        #[cfg(target_arch = "x86_64")]
-        self.x86_lazy_intx_registration();
+    pub fn set_intx_waker(&'static self, waker: Waker) -> Result<Option<Waker>, &'static str> {
+
+        // On x86 we don't properly query the ACPI tables in `init` to know
+        // which interrupt numbers are used for legacy PCI interrupts.
+        // As a workaround, we lazily register these handlers when a driver
+        // calls `PciDevice::set_intx_waker`, as by that time we're sure that
+        // the interrupt number in the device's config space is correct.
+        // On aarch64, we know the interrupt numbers at compile time but
+        // both platforms do it lazily for easier code maintenance.
+        let int_num = match self.pci_get_intx_info() {
+            #[cfg(target_arch = "x86_64")]
+            Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
+
+            #[cfg(target_arch = "aarch64")]
+            Ok((Some(irq), _pin)) => panic!("found IRQ num: {}", irq),
+
+            _ => panic!("Cannot use INTx on device {:?}: No INTx info", self),
+        };
+
+        init_intx_handler(int_num)?;
 
         let mut handle = self.intx_waker.lock();
         let prev_value = handle.replace(waker);
@@ -1000,7 +999,7 @@ impl PciDevice {
             intx_devices.push(self)
         }
 
-        prev_value
+        Ok(prev_value)
     }
 }
 

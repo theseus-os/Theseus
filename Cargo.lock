@@ -2605,6 +2605,7 @@ dependencies = [
  "arm_boards",
  "bit_field 0.7.0",
  "cpu",
+ "interrupt_controller",
  "interrupts",
  "log",
  "memory",
