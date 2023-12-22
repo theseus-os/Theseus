@@ -977,19 +977,22 @@ impl PciDevice {
         // As a workaround, we lazily register these handlers when a driver
         // calls `PciDevice::set_intx_waker`, as by that time we're sure that
         // the interrupt number in the device's config space is correct.
+        #[cfg(target_arch = "x86_64")] {
+            let int_num = match self.pci_get_intx_info() {
+                Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
+                _ => panic!("Cannot use INTx on device {:?}: No INTx info", self),
+            };
+
+            init_intx_handler(int_num)?;
+        }
+
         // On aarch64, we know the interrupt numbers at compile time but
         // both platforms do it lazily for easier code maintenance.
-        let int_num = match self.pci_get_intx_info() {
-            #[cfg(target_arch = "x86_64")]
-            Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
-
-            #[cfg(target_arch = "aarch64")]
-            Ok((Some(irq), _pin)) => panic!("found IRQ num: {}", irq),
-
-            _ => panic!("Cannot use INTx on device {:?}: No INTx info", self),
-        };
-
-        init_intx_handler(int_num)?;
+        #[cfg(target_arch = "aarch64")] {
+            for int_num in BOARD_CONFIG.pci_intx {
+                init_intx_handler(int_num)?;
+            }
+        }
 
         let mut handle = self.intx_waker.lock();
         let prev_value = handle.replace(waker);
