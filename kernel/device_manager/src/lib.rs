@@ -84,8 +84,6 @@ pub fn init(
         }
     }
 
-    pci::init()?;
-
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter()? {
         debug!("Found PCI device: {:X?}", dev);
