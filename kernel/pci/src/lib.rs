@@ -272,7 +272,8 @@ intx_handler!(pci_intx_handler_4, 3);
 
 static HANDLERS: [InterruptHandler; 4] = [pci_intx_handler_1, pci_intx_handler_2, pci_intx_handler_3, pci_intx_handler_4];
 
-pub fn init_intx_handler(int_num: InterruptNumber) -> Result<(), &'static str> {
+// Ensures that a PCI INTx interrupt handler is registered for this interrupt number
+fn init_intx_handler(int_num: InterruptNumber) -> Result<(), &'static str> {
     let mut intx_numbers = INTX_NUMBERS.lock();
     let mut slot = None;
 
