@@ -1,4 +1,6 @@
 /// Drivers for USB Controllers
+///
+/// This is an arbitrary module design, not following any specification.
 
 use super::*;
 

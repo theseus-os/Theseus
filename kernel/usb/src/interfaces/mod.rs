@@ -1,4 +1,6 @@
 /// Built-in USB interface drivers
+///
+/// This is an arbitrary module design, not following any specification.
 
 use super::*;
 

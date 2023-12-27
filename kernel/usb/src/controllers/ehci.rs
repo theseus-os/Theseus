@@ -9,11 +9,13 @@ allocator!(QueueHeadAlloc, QueueHead, 32);
 
 const PERIODIC_LIST_LEN: usize = 1024;
 
+// Used for synchronous controller monitoring
 fn sleep_ms(milliseconds: u64) {
     sleep(Duration::from_millis(milliseconds))
         .expect("[USB-EHCI] Failed to sleep for 10ms");
 }
 
+// Used for synchronous controller monitoring
 macro_rules! try_wait_until {
     ($poll_interval_ms:literal, $timeout_ms:literal, $cond:expr) => {{
         let mut elapsed = 0;
@@ -33,6 +35,14 @@ macro_rules! try_wait_until {
     }}
 }
 
+/// Structures shared with the EHCI controller
+///
+/// It has the common USB allocators as well as:
+/// * a Transfer Descriptor allocator
+/// * a Queue Head allocator
+/// * a periodic list
+///
+/// This structure will live in device memory.
 #[derive(Debug, FromBytes)]
 pub struct UsbAlloc {
     common: CommonUsbAlloc,
@@ -41,8 +51,9 @@ pub struct UsbAlloc {
     periodic_list: PeriodicList,
 }
 
+/// High Level EHCI Controller representation
 pub struct EhciController {
-    // Nth bit set = device address N taken; address 0 is invalid
+    // Nth bit set = device address N taken; address 0 is reserved
     devices: u128,
     hcs_params: HcsParams,
     op_regs: BorrowedMappedPages<OperationRegisters, Mutable>,
@@ -52,6 +63,7 @@ pub struct EhciController {
     initialized: bool,
 }
 
+/// High Level Interrupt Transfer representation
 #[derive(Debug, Copy, Clone)]
 struct InterruptTransfer {
     interface_id: InterfaceId,
@@ -64,7 +76,7 @@ struct InterruptTransfer {
 
 impl Drop for EhciController {
     fn drop(&mut self) {
-        self.turn_off().unwrap();
+        self.turn_off().expect("Couldn't turn the EHCI controller off while it was being dropped");
     }
 }
 
@@ -93,6 +105,7 @@ impl ControllerApi for EhciController {
 
                     let mut addr = Err("Out of device addresses");
 
+                    /// must start at 1; address 0 is reserved as the default address
                     for i in 1..128 {
                         let mask = 1 << i;
                         if self.devices & mask == 0 {
@@ -115,6 +128,8 @@ impl ControllerApi for EhciController {
             }
         }
 
+        // initially all ports must be reset; after it has been done
+        // once, we can trust the controller state.
         self.initialized = true;
 
         Ok(())
@@ -129,9 +144,12 @@ impl ControllerApi for EhciController {
         let mut raw_req = request.get_raw();
         let (shmem_index, shmem_addr) = request.allocate_payload(&mut self.usb_alloc.common)?;
 
+        // this loop runs exactly one or two times.
         let mut first_pass = true;
         loop {
-            // todo: handle device descriptors case (smaller data size than needed)
+            // todo: handle device descriptors case (smaller
+            // packet size than required data or something)
+            // I haven't fully understood the hypothetical problem
             let data_sz = raw_req.len() as usize;
 
             let (qh_addr, first_qtd_index, req_index) = create_request(
@@ -143,8 +161,13 @@ impl ControllerApi for EhciController {
                 shmem_addr,
             )?;
 
+            // push work onto the controller
             self.push_to_async_schedule(qh_addr)?;
+
+            // wait for the work to be done
             self.wait_for_all_td_inactive(first_qtd_index)?;
+
+            // cleanup
             self.remove_from_async_schedule(qh_addr)?;
             self.qtd_error_check(first_qtd_index)?;
             self.qh_and_qtd_cleanup(Some(qh_addr), first_qtd_index)?;
@@ -152,6 +175,8 @@ impl ControllerApi for EhciController {
             self.usb_alloc.common.requests.free(req_index)?;
 
             if first_pass {
+                // For some requests, a first pass is required to
+                // know how much data to pull from a device
                 match request.adjust_len(&self.usb_alloc.common, shmem_index)? {
                     Some(length_update) => raw_req.set_len(length_update),
                     None => break,
@@ -176,7 +201,7 @@ impl ControllerApi for EhciController {
         buffer: UsbPointer,
         size: usize,
     ) -> Result<(), &'static str> {
-        // TODO: handle polling interval
+        // TODO: handle polling interval (improvement)
 
         let (queue_head, first_qtd_index) = create_int_transfer_qh(
             &mut self.usb_alloc,
@@ -253,6 +278,14 @@ impl ControllerApi for EhciController {
 }
 
 impl EhciController {
+    /// Initializes an EHCI controller.
+    ///
+    /// Specifically:
+    /// * Identity maps some device memory to send and receive data to and from the controller
+    /// * configures interrupt triggers in the controller
+    /// * turns it on after having disabled its various schedules
+    /// * configures its various schedules (setting pointers)
+    /// * sleeps for 10ms to let it start
     pub fn init(base: PhysicalAddress) -> Result<Self, &'static str> {
         let (mut usb_alloc, four_gig_segment) = {
             // todo 1: make sure this doesn't cross a 4GiB boundary
@@ -336,6 +369,14 @@ impl EhciController {
         })
     }
 
+    // Configures a device connected to the controller
+    //
+    // Specifically:
+    // * retrieves its device descriptor
+    // * learns about its max packet size
+    // * retrieves its first configuration descriptor
+    // * learns about its various interfaces
+    // * instanciates the interface drivers
     fn init_device(&mut self, addr: DeviceAddress) -> Result<(), &'static str> {
         let mut device = descriptors::Device::default();
         self.request(addr, Request::GetDeviceDescriptor(&mut device), 8)?;
@@ -363,6 +404,15 @@ impl EhciController {
         Ok(())
     }
 
+    // Handles an interrupt transfer completed by a device
+    //
+    // Specifically:
+    // * Pauses the periodic schedule
+    // * Checks for errors
+    // * tells the interface about the completed interrupt transfer
+    // * depending on the interface driver's decision:
+    //   * re-installs the interrupt transfer so that it can trigger again
+    //   * removes it from the periodic schedule
     fn handle_interrupt_transfer(&mut self, dev_addr: DeviceAddress, t: usize) -> Result<bool, &'static str> {
         self.enable_periodic_schedule(false)?;
 
@@ -434,11 +484,15 @@ impl EhciController {
         Ok(())
     }
 
+    // Expects the periodic schedule to be disabled
     // Will enable the periodic schedule if needed
+    // EHCI 4.10.7
     fn populate_periodic_schedule(&mut self) -> Result<(), &'static str> {
         let transfer_count = self.pending_int_transfers.len();
         if transfer_count != 0 {
             let mut transfer_index = 0;
+
+            // fills the periodic table
             for entry in &mut self.usb_alloc.periodic_list.entries {
                 let transfer = &self.pending_int_transfers[transfer_index];
 
@@ -450,6 +504,7 @@ impl EhciController {
                 entry.write(queue_head_pointer(transfer.queue_head));
             }
 
+            // only enable the periodic schedule if there's work to do on it
             self.enable_periodic_schedule(true)?;
         } else {
             // no transfer => don't turn it back on
@@ -458,6 +513,7 @@ impl EhciController {
         Ok(())
     }
 
+    // Tells the controller to shut itself down
     fn turn_off(&mut self) -> Result<(), &'static str> {
         self.op_regs.command.update(|cmd| cmd.set_run_stop(false));
         Ok(())
@@ -512,6 +568,7 @@ impl EhciController {
         }
     }
 
+    // EHCI 4.8.2
     fn wait_for_all_td_inactive(&self, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
         let transfer_descriptors = &self.usb_alloc.transfer_descriptors;
         let mut qtd_index = first_qtd_index;
@@ -537,6 +594,7 @@ impl EhciController {
         Ok(())
     }
 
+    // Locate the previous queue head in the async schedule
     fn get_async_schedule_prev(&self, queue_head_addr: UsbPointer) -> Result<AllocSlot, &'static str> {
         let queue_heads = &self.usb_alloc.queue_heads;
         let mut current_index = queue_heads.find(queue_head_addr)?;
@@ -556,6 +614,7 @@ impl EhciController {
         Ok(UsbPointer(self.op_regs.async_list.read()))
     }
 
+    // EHCI 4.8.1
     fn push_to_async_schedule(&mut self, to_push_addr: UsbPointer) -> Result<(), &'static str> {
         self.enable_async_schedule(false)?;
 
@@ -575,6 +634,7 @@ impl EhciController {
         self.enable_async_schedule(true)
     }
 
+    // EHCI 4.8.2
     fn remove_from_async_schedule(&mut self, to_remove_addr: UsbPointer) -> Result<(), &'static str> {
         self.enable_async_schedule(false)?;
 
@@ -606,6 +666,14 @@ impl EhciController {
     }
 }
 
+// Initializes exchange structures corresponding to a request
+//
+// Specifically:
+// * inits a request buffer
+// * inits a setup transfer descriptor
+// * creates data transfer descriptors using create_transfer_chain
+// * inits a status transfer descriptor
+// * wraps the transfer descriptors in a queue head
 fn create_request(
     shmem: &mut UsbAlloc,
     dev_addr: DeviceAddress,
@@ -710,6 +778,12 @@ fn create_request(
     Ok((queue_head_addr, setup_qtd_index, req_index))
 }
 
+// Initializes exchange structures corresponding to an interrupt transfer
+// which will land in the periodic schedule
+//
+// Specifically:
+// * creates data transfer descriptors using create_transfer_chain
+// * wraps the transfer descriptors in a queue head
 fn create_int_transfer_qh(
     shmem: &mut UsbAlloc,
     dev_addr: DeviceAddress,
@@ -744,6 +818,7 @@ fn create_int_transfer_qh(
     Ok((queue_head_addr, first_qtd_index))
 }
 
+// Creates an assembly of transfer descriptors for data transfer
 fn create_transfer_chain(
     shmem: &mut UsbAlloc,
     initial_data_toggle: bool,

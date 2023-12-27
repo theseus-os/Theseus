@@ -1,4 +1,7 @@
 /// HID (boot protocol) interface support
+///
+/// As defined in spec:
+/// * HID 1.11
 
 use super::*;
 

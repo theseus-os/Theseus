@@ -1,4 +1,9 @@
 /// USB Requests (sent over control transfers)
+///
+/// These structs have been defined as described here:
+/// * USB 2.0 - 9.3: USB Device Requests
+/// * USB 2.0 - 9.4: Standard USB Device Requests
+/// * HID 1.11 - 7.2: Requests
 
 use super::*;
 
@@ -25,6 +30,7 @@ mod hid_req {
     pub const _SET_IDLE: u8 = 0x0A;
 }
 
+/// High Level Request Respresentation
 pub(crate) enum Request<'a> {
     GetStatus(Target, &'a mut DeviceStatus),
 

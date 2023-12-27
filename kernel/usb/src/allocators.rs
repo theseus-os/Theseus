@@ -1,4 +1,34 @@
 #![allow(dead_code)]
+//! Allocators for structures shared with the USB controller
+//!
+//! The USB controller is able to access memory at relatively
+//! arbitrary addresses. This module provides the crate with
+//! allocators via the `allocator!()` macro:
+//! ```rust
+//! // creates an allocator "RequestAlloc" with 16 slots of RawRequest objects.
+//! allocator!(pub(crate) RequestAlloc, RawRequest, 16);
+//! ```
+//! 
+//! Each slot can be designated by either its index or its raw address.
+//!
+//! This module also creates allocators for common USB structures:
+//!
+//! | Allocator Name                     | Object                         | slots |
+//! |------------------------------------|--------------------------------|-------|
+//! | `RequestAlloc`                     | `RawRequest`                   |  16   |
+//! | `ByteAlloc`                        | `u8`                           |  16   |
+//! | `WordAlloc`                        | `u16`                          |  16   |
+//! | `Buf8Alloc`                        | `[u8; 8]`                      |  16   |
+//! | `PageAlloc`                        | `[u8; 0x1000]`                 |  4    |
+//! | `DeviceDescAlloc`                  | `descriptors::Device`          |  16   |
+//! | `ConfigurationDescAlloc`           | `descriptors::Configuration`   |  8    |
+//! | `InterfaceDescAlloc`               | `descriptors::Interface`       |  16   |
+//! | `EndpointDescAlloc`                | `descriptors::Endpoint`        |  16   |
+//! | `DeviceQualifierDescAlloc`         | `descriptors::DeviceQualifier` |  16   |
+//! | `OtherSpeedConfigurationDescAlloc` | `descriptors::Configuration`   |  8    |
+//! | `StringDescAlloc`                  | `descriptors::UsbString`       |  4    |
+///
+/// This is an arbitrary module design, not following any specification.
 
 use super::*;
 
@@ -13,7 +43,7 @@ allocator!(pub(crate) ConfigurationDescAlloc, descriptors::Configuration, 8);
 allocator!(pub(crate) InterfaceDescAlloc, descriptors::Interface, 16);
 allocator!(pub(crate) EndpointDescAlloc, descriptors::Endpoint, 16);
 allocator!(pub(crate) DeviceQualifierDescAlloc, descriptors::DeviceQualifier, 16);
-allocator!(pub(crate) OtherSpeedConfigurationDescAlloc, descriptors::Configuration, 16);
+allocator!(pub(crate) OtherSpeedConfigurationDescAlloc, descriptors::Configuration, 8);
 allocator!(pub(crate) StringDescAlloc, descriptors::UsbString, 4);
 
 #[derive(Debug, FromBytes)]

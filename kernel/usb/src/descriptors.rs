@@ -1,4 +1,8 @@
 /// USB Descriptors
+///
+/// These structs have been defined as described here:
+/// * USB 2.0 - 9.5: Descriptors
+/// * USB 2.0 - 9.6: Standard USB Descriptors Definitions
 
 use super::*;
 

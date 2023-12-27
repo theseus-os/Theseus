@@ -13,6 +13,7 @@
 //! * [EHCI](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/ehci-specification-for-usb.pdf)
 //! * [UHCI](https://stuff.mit.edu/afs/sipb/contrib/doc/specs/protocol/usb/UHCI11D.PDF)
 //! * [OHCI](http://www.o3one.org/hwdocs/usb/hcir1_0a.pdf)
+//! * [HID](https://www.usb.org/sites/default/files/documents/hid1_11.pdf)
 
 #![no_std]
 #![allow(unused)]
