@@ -3,7 +3,7 @@
 ### So, to access the directory containing this file, you would use "../"
 
 .DEFAULT_GOAL := all
-SHELL := /bin/bash
+SHELL := /usr/bin/env bash
 
 ## specifies which architecture we're building for
 ARCH ?= x86_64

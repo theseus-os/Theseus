@@ -21,6 +21,7 @@ port_io = { path = "../../libs/port_io" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 arm_boards = { path = "../arm_boards" }
+interrupt_controller = { path = "../interrupt_controller" }
 
 [lib]
 crate-type = ["rlib"]

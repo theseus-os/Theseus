@@ -217,28 +217,6 @@ pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
     int_ctrl.set_destination(PL011_RX_SPI, Some(current_cpu()), u8::MAX)
 }
 
-/// Sets an interrupt handler for legacy PCI interrupts: INTA, INTB, INTC, INTD
-pub fn init_pci_interrupts(handlers: [InterruptHandler; 4]) -> Result<(), &'static str> {
-    let int_ctrl = SystemInterruptController::get()
-        .ok_or("SystemInterruptController was not yet initialized")?;
-    let dst = Some(cpu::bootstrap_cpu().unwrap());
-
-    let pci_intx_nums = BOARD_CONFIG.pci_intx.into_iter();
-    let pci_intx_handlers = handlers.into_iter();
-
-    for (int_num, handler) in pci_intx_nums.zip(pci_intx_handlers) {
-        if let Err(existing_handler) = register_interrupt(int_num, handler) {
-            if handler as InterruptHandler != existing_handler {
-                return Err("A different interrupt handler has already been setup for that PCI interrupt");
-            }
-        }
-
-        int_ctrl.set_destination(int_num, dst, u8::MAX)?;
-    }
-
-    Ok(())
-}
-
 /// Registers an interrupt handler at the given IRQ interrupt number.
 ///
 /// The function fails if the interrupt number is reserved or is already in use.

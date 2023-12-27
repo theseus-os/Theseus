@@ -1,3 +1,7 @@
+//! A bit set backed by a [`u64`].
+//!
+//! See [`BitSet`] for more details.
+
 #![no_std]
 #![feature(const_likely, core_intrinsics)]
 

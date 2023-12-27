@@ -1,5 +1,20 @@
 //! PCI Configuration Space Access
 //!
+//! ## Terminology
+//!
+//! This crate deals with multiple types of interrupts:
+//! * Legacy (INTx) interrupts are the oldest PCI interrupt representation.
+//!   * Four interrupt pins are shared among all devices.
+//!   * This crate refers to these legacy interrupts as "intx".
+//!
+//! * MSI (Message Signaled Interrupts) appeared with PCI express.
+//!   * They allow devices to allocate up to 32 interrupt numbers.
+//!   * This crate refers to these interrupts as "msi".
+//!
+//! * MSI-X messages appeared with PCIe 3.0.
+//!   * They allow devices to allocate up to 2048 interrupt numbers.
+//!   * This crate refers to these interrupts as "msix".
+//!
 //! Note: while pci currently uses port-io on x86 and mmio on aarch64,
 //! x86 may also support memory-based PCI configuration in the future;
 //! port-io is the legacy way to access the config space.
@@ -10,6 +25,7 @@
 
 #![no_std]
 #![allow(dead_code)]
+#![feature(abi_x86_interrupt)]
 
 extern crate alloc;
 
@@ -22,15 +38,18 @@ use bit_field::BitField;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use cpu::CpuId;
-use interrupts::InterruptNumber;
+use interrupts::{InterruptNumber, InterruptHandler, interrupt_handler, register_interrupt, EoiBehaviour};
 
 #[cfg(target_arch = "x86_64")]
-use port_io::Port;
+use {
+    port_io::Port,
+    interrupts::IRQ_BASE_OFFSET,
+};
 
 #[cfg(target_arch = "aarch64")]
 use {
     arm_boards::BOARD_CONFIG,
-    interrupts::{EoiBehaviour, interrupt_handler, init_pci_interrupts},
+    interrupt_controller::{SystemInterruptController, SystemInterruptControllerApi},
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -217,33 +236,74 @@ pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'s
 }
 
 static INTX_DEVICES: Mutex<Vec<&'static PciDevice>> = Mutex::new(Vec::new());
+static INTX_NUMBERS: Mutex<[Option<InterruptNumber>; 4]> = Mutex::new([None; 4]);
 
-// Architecture-independent PCI interrupt handler
-// Currently aarch64-only, because legacy interrupts aren't supported on x86 yet.
-#[cfg(target_arch = "aarch64")]
-interrupt_handler!(pci_int_handler, None, _stack_frame, {
-    let devices = INTX_DEVICES.lock();
+// Architecture-independent INTx handlers
+macro_rules! intx_handler {
+    ($name:ident, $num:literal) => {
+        interrupt_handler!($name, {
+            let intx_numbers = INTX_NUMBERS.lock();
+            intx_numbers[$num].expect("uninitialized x86 PCI INTx handler")
+        }, _stack_frame, {
+            let devices = INTX_DEVICES.lock();
 
-    for device in &*devices {
-        if device.pci_get_interrupt_status(true) {
-            device.pci_enable_interrupts(false);
-            log::info!("Device {} triggered an interrupt", device.location);
+            for device in &*devices {
+                if device.pci_get_intx_status(true) {
+                    device.pci_enable_intx(false);
+                    log::info!("Device {} triggered a legacy interrupt", device.location);
 
-            let reader = device.interrupt_waker.lock();
-            match &*reader {
-                Some(waker) => waker.wake_by_ref(),
-                None => log::error!("Device doesn't have an interrupt waker!"),
+                    let reader = device.intx_waker.lock();
+                    match &*reader {
+                        Some(waker) => waker.wake_by_ref(),
+                        None => log::error!("Device doesn't have an interrupt waker!"),
+                    }
+                }
             }
+
+            EoiBehaviour::HandlerDidNotSendEoi
+        });
+    };
+}
+
+intx_handler!(pci_intx_handler_1, 0);
+intx_handler!(pci_intx_handler_2, 1);
+intx_handler!(pci_intx_handler_3, 2);
+intx_handler!(pci_intx_handler_4, 3);
+
+static HANDLERS: [InterruptHandler; 4] = [pci_intx_handler_1, pci_intx_handler_2, pci_intx_handler_3, pci_intx_handler_4];
+
+// Ensures that a PCI INTx interrupt handler is registered for this interrupt number
+fn init_intx_handler(int_num: InterruptNumber) -> Result<(), &'static str> {
+    let mut intx_numbers = INTX_NUMBERS.lock();
+    let mut slot = None;
+
+    for i in 0..4 {
+        if intx_numbers[i] == Some(int_num) {
+            return Ok((/* this interrupt number was already initialized. */));
+        } else if intx_numbers[i].is_none() {
+            slot = Some(i);
         }
     }
 
-    EoiBehaviour::HandlerDidNotSendEoi
-});
+    let slot = slot.ok_or("More than four different INTx numbers were encountered")?;
+    intx_numbers[slot] = Some(int_num);
+    core::mem::drop(intx_numbers);
 
-/// Initializes the PCI interrupt handler
-pub fn init() -> Result<(), &'static str> {
-    #[cfg(target_arch = "aarch64")]
-    init_pci_interrupts([pci_int_handler; 4])?;
+    let pci_intx_handler = HANDLERS[slot];
+    if let Err(existing_handler) = register_interrupt(int_num, pci_intx_handler) {
+        if existing_handler != (pci_intx_handler as _) {
+            return Err("Couldn't lazily set PCI INTx handler");
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")] {
+        let int_dst = Some(cpu::bootstrap_cpu().unwrap());
+        let int_ctrl = SystemInterruptController::get()
+            .ok_or("SystemInterruptController was not yet initialized")?;
+
+        // route interrupt to bootstrap processor
+        int_ctrl.set_destination(int_num, int_dst, u8::MAX)?;
+    }
 
     Ok(())
 }
@@ -326,11 +386,11 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
                     location,
-                    interrupt_waker: Mutex::new(None),
+                    intx_waker: Mutex::new(None),
                 };
 
                 // disable legacy interrupts initially
-                device.pci_enable_interrupts(false);
+                device.pci_enable_intx(false);
 
                 device_list.push(device);
             }
@@ -550,20 +610,15 @@ impl PciLocation {
     }
 
     /// Sets the PCI device's command bit 10 to disable legacy interrupts
-    pub fn pci_set_interrupt_disable_bit(&self, bit: bool) {
+    pub fn pci_set_intx_disable_bit(&self, bit: bool) {
         let command = self.pci_read_16(PCI_COMMAND);
-        // trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
 
         let new_value = match bit {
             true => command | PCI_COMMAND_INT_DISABLED,
             false => command & !PCI_COMMAND_INT_DISABLED,
         };
-        self.pci_write_16(PCI_COMMAND, new_value);
 
-        /*trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
-            self,
-            self.pci_read_16(PCI_COMMAND),
-        );*/
+        self.pci_write_16(PCI_COMMAND, new_value);
     }
 
     /// Explores the PCI config space and returns address of requested capability, if present.
@@ -625,6 +680,13 @@ impl fmt::Debug for PciLocation {
     }
 }
 
+/// Returned by [`PciDevice::modern_interrupt_support`]
+pub struct ModernInterruptSupport {
+    /// `true` if this device supports MSI (Message Signaled Interrupts)
+    pub msi: bool,
+    /// `true` if this device supports MSI-X
+    pub msix: bool,
+}
 
 /// Contains information common to every type of PCI Device,
 /// and offers functions for reading/writing to the PCI configuration space.
@@ -637,7 +699,7 @@ pub struct PciDevice {
     pub location: PciLocation,
 
     /// The handling task for legacy PCI interrupts
-    pub interrupt_waker: Mutex<Option<Waker>>,
+    pub intx_waker: Mutex<Option<Waker>>,
 
     /// The class code, used to determine device type.
     pub class: u8,
@@ -729,6 +791,14 @@ impl PciDevice {
         mem_size += 1;                                     // Step 4
         self.pci_write_32(bar_reg_def, original_value);    // Step 5
         mem_size
+    }
+
+    /// Queries and returns whether this PCI device supports MSI and MSI-X interrupts.
+    pub fn modern_interrupt_support(&self) -> ModernInterruptSupport {
+        ModernInterruptSupport { 
+            msi: self.find_pci_capability(PciCapability::Msi).is_some(),
+            msix: self.find_pci_capability(PciCapability::Msix).is_some(),
+        }
     }
 
     /// Enable MSI interrupts for a PCI device.
@@ -859,10 +929,10 @@ impl PciDevice {
         map_frame_range(mem_base, mem_size as usize, MMIO_FLAGS)
     }
 
-    /// Reads and returns this PCI device's interrupt line and interrupt pin registers.
+    /// Reads and returns this PCI device's INTx line and INTx pin registers.
     ///
-    /// Returns an error if this PCI device's interrupt pin value is invalid (greater than 4).
-    pub fn pci_get_interrupt_info(&self) -> Result<(Option<u8>, Option<InterruptPin>), &'static str> {
+    /// Returns an error if this PCI device's INTx pin value is invalid (greater than 4).
+    pub fn pci_get_intx_info(&self) -> Result<(Option<u8>, Option<InterruptPin>), &'static str> {
         let int_line = match self.pci_read_8(PCI_INTERRUPT_LINE) {
             0xff => None,
             other => Some(other),
@@ -881,25 +951,54 @@ impl PciDevice {
     }
 
     /// Enables/Disables legacy (INTx) interrupts for this device
-    pub fn pci_enable_interrupts(&self, enable: bool) {
-        self.pci_set_interrupt_disable_bit(!enable);
+    pub fn pci_enable_intx(&self, enable: bool) {
+        self.pci_set_intx_disable_bit(!enable);
     }
 
-    /// Reads and returns this PCI device's interrupt status flag.
-    pub fn pci_get_interrupt_status(&self, check_enabled: bool) -> bool {
+    /// Checks that legacy interrupts are enabled in the command register.
+    pub fn pci_intx_enabled(&self) -> bool {
+        (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0
+    }
+
+    /// Reads and returns this PCI device's legacy interrupt status flag.
+    pub fn pci_get_intx_status(&self, check_enabled: bool) -> bool {
         const PCI_STATUS_INT: u16 = 1 << 3;
+        let pending_interrupt = || (self.pci_read_16(PCI_STATUS) & PCI_STATUS_INT) != 0;
 
-        let interrupt_enabled = || (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0;
-        let pending_interrupt = || (self.pci_read_16(PCI_STATUS)  & PCI_STATUS_INT          ) != 0;
-
-        ((!check_enabled) || interrupt_enabled()) && pending_interrupt()
+        ((!check_enabled) || self.pci_intx_enabled()) && pending_interrupt()
     }
 
-    /// Sets a task waker to be used when this device triggers an interrupt
+    /// Sets up the given `waker` to be woken when this PCI device triggers a legacy interrupt (INTx).
     ///
     /// Returns the previous interrupt waker for this device, if there was one.
-    pub fn set_interrupt_waker(&'static self, waker: Waker) -> Option<Waker> {
-        let mut handle = self.interrupt_waker.lock();
+    pub fn set_intx_waker(&'static self, waker: Waker) -> Result<Option<Waker>, &'static str> {
+
+        // On x86, we don't yet support querying the ACPI tables to properly determine
+        // which interrupt numbers are used for legacy PCI interrupts.
+        // As a workaround, we lazily register these handlers when a driver
+        // calls this function, as by that time we're sure that
+        // the interrupt number in the device's config space is correct.
+        #[cfg(target_arch = "x86_64")] {
+            let int_num = match self.pci_get_intx_info() {
+                Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
+                _ => {
+                    log::error!("Failed to get INTx info for PCI device {:?}", self);
+                    return Err("PciDevice::set_intx_waker() failed to get INTx info");
+                }
+            };
+
+            init_intx_handler(int_num)?;
+        }
+
+        // On aarch64, we *do* know the interrupt numbers statically,
+        // but we do it lazily anyway for the sake of code clarity.
+        #[cfg(target_arch = "aarch64")] {
+            for int_num in BOARD_CONFIG.pci_intx {
+                init_intx_handler(int_num)?;
+            }
+        }
+
+        let mut handle = self.intx_waker.lock();
         let prev_value = handle.replace(waker);
 
         if prev_value.is_none() {
@@ -907,7 +1006,7 @@ impl PciDevice {
             intx_devices.push(self)
         }
 
-        prev_value
+        Ok(prev_value)
     }
 }
 

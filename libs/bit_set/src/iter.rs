@@ -1,10 +1,8 @@
-//! An iterator over a bit set.
-//!
-//! See [`Iter`] for more details.
-
 use core::intrinsics::unlikely;
 
-/// An iterator over a bit set.
+/// An iterator over a [`BitSet`].
+///
+/// [`BitSet`]: crate::BitSet
 pub struct Iter {
     set: u64,
     current_mask: u64,

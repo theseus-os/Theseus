@@ -1,6 +1,6 @@
 [package]
 name = "bit_set"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A bit set storing integers less than 64"
 edition = "2021"
-
-[dependencies]
