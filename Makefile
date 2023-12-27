@@ -1,7 +1,7 @@
 ### This makefile is the top-level build script that builds all the crates in subdirectories 
 ### and combines them into the final OS .iso image.
 ### It also provides convenient targets for running and debugging Theseus and using GDB on your host computer.
-SHELL := /bin/bash
+SHELL := /usr/bin/env bash
 
 ## Disable parallelism for this Makefile since it breaks the build,
 ## as our dependencies aren't perfectly specified for each target.

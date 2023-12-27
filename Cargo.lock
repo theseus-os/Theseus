@@ -1965,6 +1965,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lspci"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "getopts",
+ "memory",
+ "pci",
+]
+
+[[package]]
 name = "lz4_flex"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

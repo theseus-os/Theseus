@@ -793,7 +793,7 @@ impl PciDevice {
         mem_size
     }
 
-    /// Detectes MSI/MSI-X support on this device
+    /// Queries and returns whether this PCI device supports MSI and MSI-X interrupts.
     pub fn modern_interrupt_support(&self) -> ModernInterruptSupport {
         ModernInterruptSupport { 
             msi: self.find_pci_capability(PciCapability::Msi).is_some(),
@@ -968,27 +968,30 @@ impl PciDevice {
         ((!check_enabled) || self.pci_intx_enabled()) && pending_interrupt()
     }
 
-    /// Sets a task waker to be used when this device triggers a legacy interrupt
+    /// Sets up the given `waker` to be woken when this PCI device triggers a legacy interrupt (INTx).
     ///
     /// Returns the previous interrupt waker for this device, if there was one.
     pub fn set_intx_waker(&'static self, waker: Waker) -> Result<Option<Waker>, &'static str> {
 
-        // On x86 we don't properly query the ACPI tables in `init` to know
+        // On x86, we don't yet support querying the ACPI tables to properly determine
         // which interrupt numbers are used for legacy PCI interrupts.
         // As a workaround, we lazily register these handlers when a driver
-        // calls `PciDevice::set_intx_waker`, as by that time we're sure that
+        // calls this function, as by that time we're sure that
         // the interrupt number in the device's config space is correct.
         #[cfg(target_arch = "x86_64")] {
             let int_num = match self.pci_get_intx_info() {
                 Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
-                _ => panic!("Cannot use INTx on device {:?}: No INTx info", self),
+                _ => {
+                    log::error!("Failed to get INTx info for PCI device {:?}", self);
+                    return Err("PciDevice::set_intx_waker() failed to get INTx info");
+                }
             };
 
             init_intx_handler(int_num)?;
         }
 
-        // On aarch64, we know the interrupt numbers at compile time but
-        // both platforms do it lazily for easier code maintenance.
+        // On aarch64, we *do* know the interrupt numbers statically,
+        // but we do it lazily anyway for the sake of code clarity.
         #[cfg(target_arch = "aarch64")] {
             for int_num in BOARD_CONFIG.pci_intx {
                 init_intx_handler(int_num)?;
