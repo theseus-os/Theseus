@@ -257,6 +257,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb6dd1c2376d2e096796e234a70e17e94cc2d5d54ff8ce42b28cef1d0d359a4"
 
 [[package]]
+name = "bit_set"
+version = "0.1.0"
+
+[[package]]
 name = "bitfield"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3130,6 +3134,7 @@ dependencies = [
 name = "scheduler_epoch"
 version = "0.1.0"
 dependencies = [
+ "bit_set",
  "log",
  "spin 0.9.4",
  "task",
