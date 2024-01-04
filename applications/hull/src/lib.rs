@@ -190,7 +190,7 @@ impl Shell {
                     let streams = IoStreams {
                         stdin: previous_output,
                         stdout: shell_streams.stdout,
-                        stderr: stderr,
+                        stderr,
                         discipline: shell_streams.discipline,
                     };
                     let part = self.resolve_external(command, args, streams, job_id)?;
