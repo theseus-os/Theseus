@@ -5,6 +5,9 @@
 //!
 //! The scheduler is comprised of two run queues: an .
 //!
+//! Note that our implementation is not constant-time since we store
+//! non-runnable tasks on the run queue.
+//!
 //! [linux-scheduler]: https://litux.nl/mirror/kerneldevelopment/0672327201/ch04lev1sec2.html
 
 #![no_std]
@@ -103,13 +106,19 @@ impl task::scheduler::Scheduler for Scheduler {
             }
         }
         self.active
-            .next(&mut self.expired)
+            .next(&mut self.expired, self.total_weight)
             .unwrap_or(self.idle_task.clone())
     }
 
     #[inline]
     fn add(&mut self, task: TaskRef) {
-        let (task, weight) = EpochTaskRef::new(task, self.total_weight);
+        let (task, weight) = EpochTaskRef::new(
+            task,
+            TaskConfiguration {
+                priority: DEFAULT_PRIORITY as usize,
+                total_weight: self.total_weight,
+            },
+        );
         self.total_weight += weight;
         self.expired.push(task, DEFAULT_PRIORITY);
     }
@@ -170,21 +179,26 @@ struct EpochTaskRef {
 }
 
 impl EpochTaskRef {
+    /// Creates a new task.
+    ///
+    /// Returns the task and the weight of the task.
     #[must_use]
     pub(crate) fn new(task: TaskRef, config: TaskConfiguration) -> (Self, usize) {
-        const NUM_TOKENS: usize =
-            TARGET_LATENCY / kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
+        let mut task = Self { task, tokens: 0 };
+        let weight = task.recalculate_tokens(config);
+        (task, weight)
+    }
+
+    #[inline]
+    pub(crate) fn recalculate_tokens(&mut self, config: TaskConfiguration) -> usize {
+        const TOTAL_TOKENS: usize = TARGET_LATENCY.as_micros() as usize
+            / kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS as usize;
 
         // TODO
         let weight = config.priority + 1;
+        self.tokens = core::cmp::max(TOTAL_TOKENS * weight / config.total_weight, 1);
 
-        (
-            Self {
-                task,
-                tokens: core::cmp::max(NUM_TOKENS * weight / config.total_weight, 1),
-            },
-            weight,
-        )
+        weight
     }
 }
 
@@ -206,16 +220,6 @@ impl DerefMut for EpochTaskRef {
     #[inline]
     fn deref_mut(&mut self) -> &mut TaskRef {
         &mut self.task
-    }
-}
-
-impl EpochTaskRef {
-    #[inline]
-    fn new(task: TaskRef) -> EpochTaskRef {
-        EpochTaskRef {
-            task,
-            tokens: INITIAL_TOKENS,
-        }
     }
 }
 

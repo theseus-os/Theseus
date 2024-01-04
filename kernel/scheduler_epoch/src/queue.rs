@@ -3,7 +3,7 @@ use alloc::collections::VecDeque;
 use bit_set::BitSet;
 use task::TaskRef;
 
-use crate::{EpochTaskRef, MAX_PRIORITY};
+use crate::{EpochTaskRef, TaskConfiguration, MAX_PRIORITY};
 
 /// A singular run queue.
 ///
@@ -29,13 +29,16 @@ impl RunQueue {
     }
 
     #[inline]
-    pub(crate) const fn len(&self) -> usize {
-        debug_assert_eq!(self.inner.iter().map(|queue| queue.len()).sum(), self.len);
+    pub(crate) fn len(&self) -> usize {
+        debug_assert_eq!(
+            self.inner.iter().map(|queue| queue.len()).sum::<usize>(),
+            self.len
+        );
         self.len
     }
 
     #[inline]
-    pub(crate) const fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
@@ -47,37 +50,93 @@ impl RunQueue {
     }
 
     #[inline]
-    pub(crate) fn next(&mut self, expired: &mut Self) -> Option<TaskRef> {
-        loop {
-            let top_index = self.top_index()?;
-            let top_queue = &mut self.inner[top_index];
+    pub(crate) fn next(&mut self, expired: &mut Self, total_weight: usize) -> Option<TaskRef> {
+        let mut priorities = self.priorities.clone();
 
-            // TODO: top_queue.len() == 1 optimisation
+        let mut top_index = priorities.max()?;
+        // TODO: top_queue.len() == 1 optimisation
+        let mut top_queue = &mut self.inner[top_index as usize];
+        let mut next_task = top_queue.front().unwrap();
 
-            let mut next_task = top_queue.pop_front().unwrap();
+        if !next_task.is_runnable() {
+            // TODO: This incredibly convoluted code is necessary because we store
+            // non-runnable tasks on the run queue.
 
-            if !next_task.is_runnable() {
-                self.len -= 1;
-                expired.push(next_task.clone(), top_index as u8);
+            // Iterate through the queue to find the next runnable task and bring it to the
+            // front of its respective run queue.
 
-                if top_queue.is_empty() {
-                    self.priorities.remove(top_index as u8);
+            let mut vec_index = 0;
+
+            while !next_task.is_runnable() {
+                vec_index += 1;
+
+                if vec_index + 1 == top_queue.len() {
+                    priorities.remove(top_index);
+                    top_index = match priorities.max() {
+                        Some(top) => top,
+                        None => {
+                            // There are no runnable tasks on the run queue. We
+                            // must transfer all the tasks to the expired run
+                            // queue and return None.
+
+                            let mut priorities = self.priorities.clone();
+
+                            while let Some(top_index) = priorities.max() {
+                                let top_queue = &mut self.inner[top_index as usize];
+
+                                while let Some(mut task) = top_queue.pop_front() {
+                                    task.recalculate_tokens(TaskConfiguration {
+                                        priority: top_index as usize,
+                                        total_weight,
+                                    });
+                                    expired.push(task, top_index);
+                                }
+
+                                priorities.remove(top_index);
+                            }
+
+                            return None;
+                        }
+                    };
+                    vec_index = 0;
                 }
-            } else if next_task.tokens <= 1 {
-                self.len -= 1;
-                expired.push(next_task.clone(), top_index as u8);
 
-                if top_queue.is_empty() {
-                    self.priorities.remove(top_index as u8);
-                }
+                top_queue = &mut self.inner[top_index as usize];
+                next_task = &top_queue[vec_index];
+            }
 
-                return Some(next_task.task);
-            } else {
-                next_task.tokens -= 1;
-                top_queue.push_back(next_task.clone());
-                return Some(next_task.task);
+            for _ in 0..vec_index {
+                let task = top_queue.pop_front().unwrap();
+                top_queue.push_back(task);
             }
         }
+
+        let queue = &mut self.inner[top_index as usize];
+        let next_task = queue.front().unwrap();
+
+        Some(if next_task.tokens <= 1 {
+            let mut next_task = queue.pop_front().unwrap();
+            self.len -= 1;
+
+            next_task.recalculate_tokens(TaskConfiguration {
+                priority: top_index as usize,
+                total_weight,
+            });
+            expired.push(next_task.clone(), top_index);
+
+            if queue.is_empty() {
+                self.priorities.remove(top_index);
+            }
+
+            next_task.clone().task
+        } else {
+            let mut next_task = queue.pop_front().unwrap();
+
+            next_task.tokens -= 1;
+            queue.push_back(next_task.clone());
+
+            next_task.task
+        })
     }
 
     #[inline]
@@ -175,18 +234,12 @@ impl Iterator for Drain {
 
     fn next(&mut self) -> Option<Self::Item> {
         let top_index = self.inner.top_index()?;
+        let top_queue = &mut self.inner.inner[top_index];
 
-        if top_index == 64 {
-            None
-        } else {
-            let top_queue = &mut self.inner.inner[top_index];
-
-            if top_queue.len() == 1 {
-                let priority = 64 - top_index;
-                self.inner.priorities.remove(priority as u8);
-            }
-
-            Some(top_queue.pop_front().unwrap().into())
+        if top_queue.len() == 1 {
+            self.inner.priorities.remove(top_index as u8);
         }
+
+        Some(top_queue.pop_front().unwrap().into())
     }
 }
