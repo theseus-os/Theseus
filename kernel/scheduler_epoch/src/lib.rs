@@ -3,6 +3,8 @@
 //! The implementation is based on the [`O(1)` Linux
 //! scheduler][linux-scheduler].
 //!
+//! The scheduler is comprised of two run queues: an .
+//!
 //! [linux-scheduler]: https://litux.nl/mirror/kerneldevelopment/0672327201/ch04lev1sec2.html
 
 #![no_std]
@@ -16,6 +18,7 @@ use alloc::{boxed::Box, vec::Vec};
 use core::{
     mem,
     ops::{Deref, DerefMut},
+    time::Duration,
 };
 
 use task::TaskRef;
@@ -24,13 +27,20 @@ use crate::queue::RunQueue;
 
 const MAX_PRIORITY: u8 = 63;
 const DEFAULT_PRIORITY: u8 = 20;
-const INITIAL_TOKENS: usize = 0;
 
-/// An instance of an epoch scheduler, typically one per CPU.
+/// The minimum amount of time for every runnable task to run.
+///
+/// This is not strictly adhered to when the tasks are run
+const TARGET_LATENCY: Duration = Duration::from_millis(15);
+
+/// An epoch scheduler.
+///
+/// See crate-level docs for more information.
 pub struct Scheduler {
     idle_task: TaskRef,
     active: RunQueue,
     expired: RunQueue,
+    total_weight: usize,
 }
 
 impl Scheduler {
@@ -40,6 +50,8 @@ impl Scheduler {
             idle_task,
             active: RunQueue::new(),
             expired: RunQueue::new(),
+            // TODO: 0 or 1
+            total_weight: 0,
         }
     }
 
@@ -81,6 +93,7 @@ impl<T> Returnable for Option<T> {
 }
 
 impl task::scheduler::Scheduler for Scheduler {
+    #[inline]
     fn next(&mut self) -> TaskRef {
         if self.active.is_empty() {
             if !self.expired.is_empty() {
@@ -94,23 +107,29 @@ impl task::scheduler::Scheduler for Scheduler {
             .unwrap_or(self.idle_task.clone())
     }
 
+    #[inline]
     fn add(&mut self, task: TaskRef) {
-        let task = EpochTaskRef::new(task);
+        let (task, weight) = EpochTaskRef::new(task, self.total_weight);
+        self.total_weight += weight;
         self.expired.push(task, DEFAULT_PRIORITY);
     }
 
+    #[inline]
     fn busyness(&self) -> usize {
         self.active.len() + self.expired.len()
     }
 
+    #[inline]
     fn remove(&mut self, task: &TaskRef) -> bool {
         self.apply(|run_queue| run_queue.remove(task))
     }
 
+    #[inline]
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler::PriorityScheduler> {
         Some(self)
     }
 
+    #[inline]
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_> {
         let mut active = RunQueue::new();
         let mut expired = RunQueue::new();
@@ -121,6 +140,7 @@ impl task::scheduler::Scheduler for Scheduler {
         Box::new(active.drain().chain(expired.drain()))
     }
 
+    #[inline]
     fn tasks(&self) -> Vec<TaskRef> {
         self.active
             .clone()
@@ -131,11 +151,13 @@ impl task::scheduler::Scheduler for Scheduler {
 }
 
 impl task::scheduler::PriorityScheduler for Scheduler {
+    #[inline]
     fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
         let priority = core::cmp::min(priority, MAX_PRIORITY);
         self.apply(|run_queue| run_queue.set_priority(task, priority))
     }
 
+    #[inline]
     fn priority(&mut self, task: &TaskRef) -> Option<u8> {
         self.apply(|run_queue| run_queue.priority(task))
     }
@@ -147,21 +169,48 @@ struct EpochTaskRef {
     tokens: usize,
 }
 
+impl EpochTaskRef {
+    #[must_use]
+    pub(crate) fn new(task: TaskRef, config: TaskConfiguration) -> (Self, usize) {
+        const NUM_TOKENS: usize =
+            TARGET_LATENCY / kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
+
+        // TODO
+        let weight = config.priority + 1;
+
+        (
+            Self {
+                task,
+                tokens: core::cmp::max(NUM_TOKENS * weight / config.total_weight, 1),
+            },
+            weight,
+        )
+    }
+}
+
+pub(crate) struct TaskConfiguration {
+    pub(crate) priority: usize,
+    pub(crate) total_weight: usize,
+}
+
 impl Deref for EpochTaskRef {
     type Target = TaskRef;
 
+    #[inline]
     fn deref(&self) -> &TaskRef {
         &self.task
     }
 }
 
 impl DerefMut for EpochTaskRef {
+    #[inline]
     fn deref_mut(&mut self) -> &mut TaskRef {
         &mut self.task
     }
 }
 
 impl EpochTaskRef {
+    #[inline]
     fn new(task: TaskRef) -> EpochTaskRef {
         EpochTaskRef {
             task,
@@ -171,6 +220,7 @@ impl EpochTaskRef {
 }
 
 impl From<EpochTaskRef> for TaskRef {
+    #[inline]
     fn from(value: EpochTaskRef) -> Self {
         value.task
     }

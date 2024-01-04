@@ -5,6 +5,9 @@ use task::TaskRef;
 
 use crate::{EpochTaskRef, MAX_PRIORITY};
 
+/// A singular run queue.
+///
+/// The scheduler contains two of these: an active one, and an expired one.
 #[derive(Debug, Clone)]
 pub(crate) struct RunQueue {
     // TODO: Encode using MAX_PRIORITY
@@ -14,6 +17,7 @@ pub(crate) struct RunQueue {
 }
 
 impl RunQueue {
+    #[inline]
     pub(crate) const fn new() -> Self {
         const INIT: VecDeque<EpochTaskRef> = VecDeque::new();
 
@@ -24,20 +28,25 @@ impl RunQueue {
         }
     }
 
+    #[inline]
     pub(crate) const fn len(&self) -> usize {
+        debug_assert_eq!(self.inner.iter().map(|queue| queue.len()).sum(), self.len);
         self.len
     }
 
+    #[inline]
     pub(crate) const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     pub(crate) fn push(&mut self, task: EpochTaskRef, priority: u8) {
         self.priorities.insert(priority);
         self.inner[priority as usize].push_back(task);
         self.len += 1;
     }
 
+    #[inline]
     pub(crate) fn next(&mut self, expired: &mut Self) -> Option<TaskRef> {
         loop {
             let top_index = self.top_index()?;
@@ -71,10 +80,12 @@ impl RunQueue {
         }
     }
 
+    #[inline]
     fn top_index(&self) -> Option<usize> {
         self.priorities.max().map(|priority| priority as usize)
     }
 
+    #[inline]
     pub(crate) fn remove(&mut self, task: &TaskRef) -> bool {
         for i in self.priorities.iter() {
             let queue = &mut self.inner[i];
@@ -98,6 +109,7 @@ impl RunQueue {
     }
 
     /// Returns the priority of the given task.
+    #[inline]
     pub(crate) fn priority(&self, task: &TaskRef) -> Option<u8> {
         for i in self.priorities.iter() {
             let queue = &self.inner[i];
@@ -114,6 +126,7 @@ impl RunQueue {
     ///
     /// Returns `true` if an action was performed i.e. if the task was in the
     /// run queue.
+    #[inline]
     pub(crate) fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
         for i in self.priorities.iter() {
             let queue = &mut self.inner[i];
@@ -137,6 +150,7 @@ impl RunQueue {
         false
     }
 
+    #[inline]
     pub(crate) fn drain(self) -> Drain {
         Drain { inner: self }
     }

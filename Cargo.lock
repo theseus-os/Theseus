@@ -3146,6 +3146,7 @@ name = "scheduler_epoch"
 version = "0.1.0"
 dependencies = [
  "bit_set",
+ "kernel_config",
  "log",
  "spin 0.9.4",
  "task",
