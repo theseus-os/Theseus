@@ -25,6 +25,7 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
+usb_hid ?= no
 
 ## aarch64 only supports booting via UEFI
 ifeq ($(ARCH),aarch64)
@@ -773,6 +774,12 @@ help:
 	@echo -e "\t Configure which bootloader to pack into the final \".iso\" file."
 	@echo -e "\t    'grub':    Use the GRUB bootloader. Default value."
 	@echo -e "\t    'limine':  Use the Limine bootloader. See setup instructions in the README."
+	
+	@echo -e "\nThe following key-value options are available to emulate USB devices:"
+	@echo -e "   usb_hid=yes|no"
+	@echo -e "\t Enables or disables the emulation of USB HID devices."
+	@echo -e "\t    'no':  No USB HID device; enables PS/2 input on x86. Default value."
+	@echo -e "\t    'yes': Creates a virtual USB controller with keyboard and mouse plugged in."
 
 	@echo -e "\nThe following key-value options are available to customize the build process:"
 	@echo -e "   merge_sections=yes|no"
@@ -949,11 +956,16 @@ else ifeq ($(ARCH),aarch64)
 	QEMU_FLAGS += -machine virt,gic-version=3
 	QEMU_FLAGS += -device ramfb
 	QEMU_FLAGS += -cpu cortex-a72
-	QEMU_FLAGS += -usb
-	QEMU_FLAGS += -device usb-ehci,id=ehci
-	QEMU_FLAGS += -device usb-kbd
 else
 	QEMU_FLAGS += -cpu Broadwell
+endif
+
+## USB devices
+ifeq ($(usb_hid),yes)
+	QEMU_FLAGS += -usb
+	QEMU_FLAGS += -device usb-ehci,id=ehci
+	QEMU_FLAGS += -device usb-kbd,bus=ehci.0
+	QEMU_FLAGS += -device usb-mouse,bus=ehci.0
 endif
 
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
