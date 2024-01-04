@@ -128,7 +128,7 @@ impl Configuration {
     /// to locate interface descriptors and interface-specific
     /// descriptors.
     pub fn find_desc<T: FromBytes>(&self, start_search_at: usize, search: DescriptorType) -> Result<(&T, usize), &'static str> {
-        let len = (self.inner.total_length - size_of::<ConfigInner>()) as usize;
+        let len = (self.inner.total_length as usize) - size_of::<ConfigInner>();
         let mut i = start_search_at;
         while i < len {
             let desc_len = self.details[i] as usize;
