@@ -188,10 +188,9 @@ impl Shell {
                     return result.map(|_| None);
                 } else {
                     let streams = IoStreams {
-                        // TODO: Technically clone not needed.
-                        stdin: previous_output.clone(),
-                        stdout: shell_streams.stdout.clone(),
-                        stderr: stderr.clone(),
+                        stdin: previous_output,
+                        stdout: shell_streams.stdout,
+                        stderr: stderr,
                         discipline: shell_streams.discipline,
                     };
                     let part = self.resolve_external(command, args, streams, job_id)?;
@@ -204,7 +203,7 @@ impl Shell {
 
             let pipe = Stdio::new();
             let streams = IoStreams {
-                stdin: previous_output.clone(),
+                stdin: previous_output,
                 stdout: Arc::new(pipe.get_writer()),
                 stderr: stderr.clone(),
                 discipline: None,
@@ -370,7 +369,7 @@ impl Shell {
 
         Ok(JobPart {
             state: State::Running,
-            task: task_ref,
+            task: task_ref.clone(),
         })
     }
 }
