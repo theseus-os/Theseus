@@ -8,8 +8,19 @@
 //! // creates an allocator "RequestAlloc" with 16 slots of RawRequest objects.
 //! allocator!(pub(crate) RequestAlloc, RawRequest, 16);
 //! ```
-//! 
+//!
+//! These allocators assume that they live in identity-mapped allocations,
+//! i.e. their physical addresses must be the same as their virtual addresses.
+//!
 //! Each slot can be designated by either its index or its raw address.
+//!
+//! The specificity of these allocators is that:
+//! - they provide both slot-index- and address-based APIs
+//! - they are easy to use safely with USB, as they allow you
+//!   to check that a certain address actually point to a structure
+//!   of the right type.
+//!
+//! Replacing these with a generic allocator would probably be possible.
 //!
 //! This module also creates allocators for common USB structures:
 //!
@@ -84,7 +95,8 @@ pub(crate) struct UsbPointer(pub u32);
 
 impl UsbPointer {
     pub(crate) fn from_ref<T>(t_ref: &T) -> Self {
-        // todo: check that it's in range
+        // TODO: check that it's in the 4GiB range
+        // accessible by the USB controller
         Self(t_ref as *const T as usize as u32)
     }
 }

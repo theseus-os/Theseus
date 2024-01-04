@@ -288,9 +288,10 @@ impl EhciController {
     /// * sleeps for 10ms to let it start
     pub fn init(base: PhysicalAddress) -> Result<Self, &'static str> {
         let (mut usb_alloc, four_gig_segment) = {
-            // todo 1: make sure this doesn't cross a 4GiB boundary
-            // todo 2: no need to ID-map this but then
-            // I'd need to convert pages to frames very often
+            // TODO 1: make sure this doesn't cross a 4GiB boundary
+            // TODO 2: ID-maps the allocators because it makes things
+            //         much simpler; the allocators currently assume
+            //         that they live in an identity-mapping.
             let needed_mem = size_of::<UsbAlloc>();
             let num_pages = (needed_mem + (PAGE_SIZE - 1)) / PAGE_SIZE;
             log::info!("EHCI USB allocator size: {} bytes", needed_mem);
@@ -383,6 +384,7 @@ impl EhciController {
 
         let max_packet_size = device.max_packet_size as MaxPacketSize;
 
+        // fill config with zeros; it will be overwritten
         let mut config = unsafe { core::mem::MaybeUninit::<descriptors::Configuration>::zeroed().assume_init() };
         self.request(addr, Request::GetConfigDescriptor(0, &mut config), max_packet_size)?;
 
