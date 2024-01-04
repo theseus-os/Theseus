@@ -369,7 +369,7 @@ impl Shell {
 
         Ok(JobPart {
             state: State::Running,
-            task: task_ref.clone(),
+            task: task_ref,
         })
     }
 }
