@@ -121,8 +121,14 @@ pub(crate) struct ConfigInner {
 }
 
 impl Configuration {
+    /// Tries to find a descriptor in the buffer following
+    /// configuration descriptors
+    ///
+    /// This method is used at device initialization time,
+    /// to locate interface descriptors and interface-specific
+    /// descriptors.
     pub fn find_desc<T: FromBytes>(&self, start_search_at: usize, search: DescriptorType) -> Result<(&T, usize), &'static str> {
-        let len = (self.inner.total_length - 9) as usize;
+        let len = (self.inner.total_length - size_of::<ConfigInner>()) as usize;
         let mut i = start_search_at;
         while i < len {
             let desc_len = self.details[i] as usize;
@@ -131,10 +137,21 @@ impl Configuration {
                 return Err("Malformed descriptor");
             }
 
+            /// found the signature of a compatible descriptor!
             if u8::from(search) == desc_type {
+                // must transmute the byte array as T
+
+                if self.details[i..].len() < size_of::<T>() {
+                    return Err("Malformed descriptor");
+                }
+
                 let ptr = (&self.details[i]) as *const u8;
                 let cast_ptr: *const T = ptr.cast();
+
+                // safe because T is zerocopy::FromBytes
+                // and the slice contained enough bytes
                 let maybe_ref = unsafe { cast_ptr.as_ref() };
+
                 return maybe_ref
                     .ok_or("Failed to point to configuration buffer")
                     .map(|t| (t, i + desc_len));
