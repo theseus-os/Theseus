@@ -111,17 +111,21 @@ pub fn init() -> Result<&'static PS2Controller, &'static str> {
     controller.write_config(config);
 
     // Step 10: Reset Devices
-    let keyboard_ref = PS2Keyboard::new(&controller);
-    if let Err(e) = keyboard_ref.reset() {
-        warn!("couldn't reset the keyboard; assuming there is none: {e}");
-    } else {
-        controller.keyboard_attached = true;
+    if port_1_works {
+        let keyboard_ref = PS2Keyboard::new(&controller);
+        if let Err(e) = keyboard_ref.reset() {
+            warn!("couldn't reset the keyboard; assuming there is none: {e}");
+        } else {
+            controller.keyboard_attached = true;
+        }
     }
-    let mouse_ref = PS2Mouse::new(&controller);
-    if let Err(e) = mouse_ref.reset() {
-        warn!("couldn't reset the mouse; assuming there is none: {e}");
-    } else {
-        controller.mouse_attached = true;
+    if port_2_works {
+        let mouse_ref = PS2Mouse::new(&controller);
+        if let Err(e) = mouse_ref.reset() {
+            warn!("couldn't reset the mouse; assuming there is none: {e}");
+        } else {
+            controller.mouse_attached = true;
+        }
     }
 
     debug!("Final PS/2 {:?}", controller.read_config());
