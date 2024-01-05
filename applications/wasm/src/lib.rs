@@ -13,7 +13,6 @@
 //!
 //! Passing Arguments/Flags to WebAssembly Binary:
 //!     wasm --dir . example.wasm ARG1 ARG2 ARG3
-//!
 
 #![no_std]
 
@@ -27,9 +26,16 @@ extern crate path;
 extern crate task;
 extern crate wasi_interpreter;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::String,
+    vec::Vec,
+};
+
 use fs_node::FileOrDir;
-use getopts::{Options, ParsingStyle};
+use getopts::{
+    Options,
+    ParsingStyle,
+};
 use path::Path;
 
 pub fn main(args: Vec<String>) -> isize {

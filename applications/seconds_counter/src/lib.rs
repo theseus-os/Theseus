@@ -2,7 +2,10 @@
 
 extern crate alloc;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::String,
+    vec::Vec,
+};
 
 pub fn main(_: Vec<String>) {
     let mut counter = 0;

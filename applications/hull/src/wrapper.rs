@@ -1,7 +1,11 @@
 //! Allows stdio to be used with `noline`.
 
 use alloc::sync::Arc;
-use app_io::{ImmutableRead, ImmutableWrite};
+
+use app_io::{
+    ImmutableRead,
+    ImmutableWrite,
+};
 use core2::io;
 use embedded_hal::serial;
 
@@ -16,10 +20,7 @@ impl serial::Read<u8> for Wrapper {
     fn read(&mut self) -> nb::Result<u8, Self::Error> {
         let mut buf = [0; 1];
         match self.stdin.read(&mut buf)? {
-            0 => Err(nb::Error::Other(io::Error::new(
-                io::ErrorKind::Other,
-                "read zero",
-            ))),
+            0 => Err(nb::Error::Other(io::Error::new(io::ErrorKind::Other, "read zero"))),
             _ => Ok(buf[0]),
         }
     }

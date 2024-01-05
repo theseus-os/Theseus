@@ -11,8 +11,8 @@
 //! Terminology used in this file using `sleep 1 | sleep 2 & sleep 3` as an
 //! example:
 //! - A line is an entire line of user input i.e. `sleep 1 | sleep 2 & sleep 3`.
-//! - A task is a subset of a line used to spawn an individual task i.e. `sleep
-//!   1`, `sleep 2`, and `sleep 3`.
+//! - A task is a subset of a line used to spawn an individual task i.e. `sleep 1`, `sleep 2`, and
+//!   `sleep 3`.
 //! - A job is a list of piped tasks i.e. `sleep 1 | sleep 2`, and `sleep 3`.
 //! - A command is the first word in a task i.e. `sleep`.
 //! - The arguments are any subsequent words in a task i.e. `1`, `2`, and `3`.
@@ -28,24 +28,56 @@ mod job;
 mod parse;
 mod wrapper;
 
-use crate::{
-    job::{JobPart, State},
-    parse::{ParsedJob, ParsedLine, ParsedTask},
+use alloc::{
+    borrow::ToOwned,
+    format,
+    string::String,
+    sync::Arc,
+    vec::Vec,
 };
-use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
-use app_io::{println, IoStreams};
 use core::fmt::Write;
+
+use app_io::{
+    println,
+    IoStreams,
+};
 use hashbrown::HashMap;
 use job::Job;
-use log::{error, warn};
-use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
+use log::{
+    error,
+    warn,
+};
+use noline::{
+    builder::EditorBuilder,
+    sync::embedded::IO as Io,
+};
 use path::PathBuf;
 use stdio::Stdio;
 use sync_block::Mutex;
-use task::{ExitValue, KillReason};
-use tty::{Event, LineDiscipline};
+use task::{
+    ExitValue,
+    KillReason,
+};
+use tty::{
+    Event,
+    LineDiscipline,
+};
 
-pub use crate::error::{Error, Result};
+pub use crate::error::{
+    Error,
+    Result,
+};
+use crate::{
+    job::{
+        JobPart,
+        State,
+    },
+    parse::{
+        ParsedJob,
+        ParsedLine,
+        ParsedTask,
+    },
+};
 
 pub fn main(_: Vec<String>) -> isize {
     let mut shell = Shell {
@@ -83,9 +115,7 @@ impl Shell {
     /// Configures the line discipline for use by applications.
     fn set_app_discipline(&self) -> AppDisciplineGuard {
         self.discipline.set_sane();
-        AppDisciplineGuard {
-            discipline: self.discipline.clone(),
-        }
+        AppDisciplineGuard { discipline: self.discipline.clone() }
     }
 
     fn run(&mut self) -> Result<()> {
@@ -149,12 +179,7 @@ impl Shell {
     }
 
     /// Executes a command.
-    fn execute_cmd(
-        &mut self,
-        parsed_job: ParsedJob,
-        job_str: &str,
-        current: bool,
-    ) -> Result<Option<usize>> {
+    fn execute_cmd(&mut self, parsed_job: ParsedJob, job_str: &str, current: bool) -> Result<Option<usize>> {
         let shell_streams = app_io::streams().unwrap();
 
         let stderr = shell_streams.stderr;
@@ -165,11 +190,7 @@ impl Shell {
 
         let mut jobs = self.jobs.lock();
         let mut job_id = 1;
-        let mut temp_job = Job {
-            string: job_str.to_owned(),
-            parts: Vec::new(),
-            current,
-        };
+        let mut temp_job = Job { string: job_str.to_owned(), parts: Vec::new(), current };
         loop {
             match jobs.try_insert(job_id, temp_job) {
                 Ok(_) => break,
@@ -220,9 +241,7 @@ impl Shell {
 
     fn wait_on_job(&mut self, num: usize) -> Result<()> {
         let jobs = self.jobs.lock();
-        let Some(job) = jobs.get(&num) else {
-            return Ok(())
-        };
+        let Some(job) = jobs.get(&num) else { return Ok(()) };
         if !job.current {
             warn!("asked to wait on non-current job");
             return Ok(());
@@ -251,11 +270,11 @@ impl Shell {
                 if let Some(job) = jobs.get_mut(&num)
                     && let Some(exit_value) = job.exit_value()
                 {
-                        jobs.remove(&num);
-                        return match exit_value {
-                            0 => Ok(()),
-                            _ => Err(Error::Command(exit_value)),
-                        };
+                    jobs.remove(&num);
+                    return match exit_value {
+                        0 => Ok(()),
+                        _ => Err(Error::Command(exit_value)),
+                    };
                 }
             }
             scheduler::schedule();
@@ -288,13 +307,7 @@ impl Shell {
         })
     }
 
-    fn resolve_external(
-        &self,
-        cmd: &str,
-        args: Vec<&str>,
-        streams: IoStreams,
-        job_id: usize,
-    ) -> Result<JobPart> {
+    fn resolve_external(&self, cmd: &str, args: Vec<&str>, streams: IoStreams, job_id: usize) -> Result<JobPart> {
         let namespace_dir = task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
             .expect("couldn't get namespace dir");
@@ -367,10 +380,7 @@ impl Shell {
         .spawn()
         .map_err(Error::SpawnFailed)?;
 
-        Ok(JobPart {
-            state: State::Running,
-            task: task_ref,
-        })
+        Ok(JobPart { state: State::Running, task: task_ref })
     }
 }
 
@@ -386,20 +396,15 @@ impl Drop for AppDisciplineGuard {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloc::vec;
+
+    use super::*;
 
     #[test]
     fn test_split_pipes() {
         assert_eq!(
             split_pipes("a b c |d e f|g | h | i j"),
-            vec![
-                ("a", vec!["b", "c"]),
-                ("d", vec!["e", "f"]),
-                ("g", vec![]),
-                ("h", vec![]),
-                ("i", vec!["j"])
-            ]
+            vec![("a", vec!["b", "c"]), ("d", vec!["e", "f"]), ("g", vec![]), ("h", vec![]), ("i", vec!["j"])]
         );
     }
 

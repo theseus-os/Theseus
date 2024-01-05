@@ -4,7 +4,10 @@
 
 extern crate alloc;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::String,
+    vec::Vec,
+};
 
 pub fn main(_args: Vec<String>) -> isize {
     if let Err(e) = run() {
