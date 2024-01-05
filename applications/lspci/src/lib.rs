@@ -3,14 +3,18 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate app_io;
+#[macro_use]
+extern crate app_io;
 extern crate getopts;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{
+    string::String,
+    vec::Vec,
+};
+
 use getopts::Options;
-use pci::pci_device_iter;
 use memory::PhysicalAddress;
+use pci::pci_device_iter;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -21,7 +25,7 @@ pub fn main(args: Vec<String>) -> isize {
         Err(_f) => {
             println!("{}", _f);
             print_usage(opts);
-            return -1; 
+            return -1;
         }
     };
 
@@ -65,11 +69,9 @@ fn list_pci_devices() -> Result<(), &'static str> {
     Ok(())
 }
 
-
 fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
-
 
 const USAGE: &str = "Usage: lspci
 An application which lists currently connected PCI devices.";

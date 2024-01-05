@@ -1,6 +1,7 @@
 //! Shell-specific errors.
 
 use alloc::string::String;
+
 use app_io::println;
 use task::RunState;
 

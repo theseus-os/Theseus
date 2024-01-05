@@ -19,8 +19,8 @@ extern crate alloc;
 // use keycodes_ascii::{Keycode, KeyAction};
 // use core::str;
 use alloc::{
-    vec::Vec,
     string::String,
+    vec::Vec,
 };
 // use getopts::Options;
 // use path::Path;
@@ -45,30 +45,24 @@ use alloc::{
 //         return Err("failed to get current task".to_string());
 //     };
 //     let path = Path::new(file_path);
-    
+
 //     // navigate to the filepath specified by first argument
 //     match path.get(&curr_wd) {
-//         Some(file_dir_enum) => { 
+//         Some(file_dir_enum) => {
 //             match file_dir_enum {
 //                 FileOrDir::Dir(directory) => {
-//                     Err(format!("{:?} is a directory, cannot 'less' non-files.", directory.lock().get_name()))
-//                 }
+//                     Err(format!("{:?} is a directory, cannot 'less' non-files.",
+// directory.lock().get_name()))                 }
 //                 FileOrDir::File(file) => {
 //                     let mut file_locked = file.lock();
 //                     let file_size = file_locked.len();
 //                     let mut string_slice_as_bytes = vec![0; file_size];
-//                     let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes, 0) {
-//                         Ok(num) => num,
-//                         Err(e) => {
-//                             return Err(format!("Failed to read {:?}, error {:?}",
-//                                                file_locked.get_name(), e))
-//                         }
-//                     };
-//                     let read_string = match str::from_utf8(&string_slice_as_bytes) {
-//                         Ok(string_slice) => string_slice,
-//                         Err(utf8_err) => {
-//                             return Err(format!("File {:?} was not a printable UTF-8 text file: {}",
-//                                                file_locked.get_name(), utf8_err))
+//                     let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes,
+// 0) {                         Ok(num) => num, Err(e) => { return Err(format!("Failed to read {:?},
+//    error {:?}", file_locked.get_name(), e)) } }; let read_string = match
+//    str::from_utf8(&string_slice_as_bytes) { Ok(string_slice) => string_slice, Err(utf8_err) => {
+//    return Err(format!("File {:?} was not a printable UTF-8 text file:
+// {}",                                                file_locked.get_name(), utf8_err))
 //                         }
 //                     };
 //                     Ok(read_string.to_string())
@@ -81,14 +75,14 @@ use alloc::{
 //     }
 // }
 
-// /// This function parses the text file. It scans through the whole file and records the string slice
-// /// for each line. This function has full UTF-8 support, which means that the case where a single character
-// /// occupies multiple bytes are well considered. The slice index returned by this function is guaranteed
-// /// not to cause panic.
+// /// This function parses the text file. It scans through the whole file and records the string
+// slice /// for each line. This function has full UTF-8 support, which means that the case where a
+// single character /// occupies multiple bytes are well considered. The slice index returned by
+// this function is guaranteed /// not to cause panic.
 // fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'static str> {
 //     // Get the width and height of the terminal screen.
-//     let (width, _height) = app_io::get_my_terminal().ok_or("couldn't get terminal for `less` app")?
-//         .lock()
+//     let (width, _height) = app_io::get_my_terminal().ok_or("couldn't get terminal for `less`
+// app")?         .lock()
 //         .get_text_dimensions();
 
 //     // Record the slice index of each line.
@@ -99,13 +93,13 @@ use alloc::{
 //     let mut char_num_in_line: usize = 0;
 //     // Starting index in the String of the current line.
 //     let mut line_start_idx: usize = 0;
-//     // The previous character during the iteration. Set '\0' as the initial value since we don't expect
-//     // to encounter this character in the beginning of the file.
+//     // The previous character during the iteration. Set '\0' as the initial value since we don't
+// expect     // to encounter this character in the beginning of the file.
 //     let mut previous_char: char = '\0';
 
 //     // Iterate through the whole file.
-//     // `c` is the current character. `str_idx` is the index of the first byte of the current character.
-//     for (str_idx, c) in content.char_indices() {
+//     // `c` is the current character. `str_idx` is the index of the first byte of the current
+// character.     for (str_idx, c) in content.char_indices() {
 //         // When we need to begin a new line, record the previous line in the map.
 //         if char_num_in_line == width || previous_char == '\n' {
 //             map.insert(cur_line_num, LineSlice{ start: line_start_idx, end: str_idx });
@@ -199,9 +193,7 @@ use alloc::{
 //     }
 // }
 
-
 pub fn main(_args: Vec<String>) -> isize {
-
     // // Get stdout.
     // let stdout = match app_io::stdout() {
     //     Ok(stdout) => stdout,

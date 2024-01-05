@@ -1,8 +1,14 @@
 //! Builtin shell commands.
 
-use crate::{Error, Result, Shell};
 use alloc::string::ToString;
+
 use app_io::println;
+
+use crate::{
+    Error,
+    Result,
+    Shell,
+};
 
 // TODO: Decide which builtins we don't need.
 
@@ -63,12 +69,7 @@ impl Shell {
             return Err(Error::Command(1));
         }
 
-        let path = if let Some(arg) = args.first() {
-            *arg
-        } else {
-            "/"
-        }
-        .as_ref();
+        let path = if let Some(arg) = args.first() { *arg } else { "/" }.as_ref();
 
         let task = task::get_my_current_task().ok_or(Error::CurrentTaskUnavailable)?;
 

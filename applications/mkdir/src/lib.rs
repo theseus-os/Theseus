@@ -1,15 +1,21 @@
 #![no_std]
-#[macro_use] extern crate app_io;
+#[macro_use]
+extern crate app_io;
 
 extern crate alloc;
-extern crate task;
-extern crate getopts;
 extern crate fs_node;
+extern crate getopts;
+extern crate task;
 extern crate vfs_node;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    string::{
+        String,
+        ToString,
+    },
+    vec::Vec,
+};
+
 // use fs_node::FileOrDir;
 use vfs_node::VFSDirectory;
 

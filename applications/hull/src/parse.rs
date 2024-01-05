@@ -28,11 +28,7 @@ impl<'a> From<&'a str> for ParsedLine<'a> {
         // Iterator contains at least one element.
         let last = iter.next_back().unwrap();
         let trimmed = last.trim();
-        let foreground = if trimmed.is_empty() {
-            None
-        } else {
-            Some((last, parse_job(trimmed)))
-        };
+        let foreground = if trimmed.is_empty() { None } else { Some((last, parse_job(trimmed))) };
 
         ParsedLine {
             background: iter
@@ -68,9 +64,6 @@ fn parse_task(task: &str) -> ParsedTask {
         let args = args_str.split(' ').collect();
         ParsedTask { command, args }
     } else {
-        ParsedTask {
-            command: task,
-            args: Vec::new(),
-        }
+        ParsedTask { command: task, args: Vec::new() }
     }
 }

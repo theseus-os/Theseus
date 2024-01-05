@@ -6,12 +6,28 @@
 
 #![no_std]
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{
+    boxed::Box,
+    string::String,
+    vec::Vec,
+};
 
-use app_io::{print, println};
-use qemu_exit::{QEMUExit, X86};
-use task::{ExitValue, KillReason};
-use path::{Path, PathBuf};
+use app_io::{
+    print,
+    println,
+};
+use path::{
+    Path,
+    PathBuf,
+};
+use qemu_exit::{
+    QEMUExit,
+    X86,
+};
+use task::{
+    ExitValue,
+    KillReason,
+};
 
 extern crate alloc;
 
