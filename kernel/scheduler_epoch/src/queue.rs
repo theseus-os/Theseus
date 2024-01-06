@@ -3,7 +3,7 @@ use alloc::collections::VecDeque;
 use bit_set::BitSet;
 use task::TaskRef;
 
-use crate::{EpochTaskRef, TaskConfiguration, MAX_PRIORITY};
+use crate::{weight, EpochTaskRef, TaskConfiguration, MAX_PRIORITY};
 
 /// A singular run queue.
 ///
@@ -68,7 +68,7 @@ impl RunQueue {
             let mut vec_index = 0;
 
             while !next_task.is_runnable() {
-                vec_index += 1;
+                assert!(!top_queue.is_empty());
 
                 if vec_index + 1 == top_queue.len() {
                     priorities.remove(top_index);
@@ -86,7 +86,7 @@ impl RunQueue {
 
                                 while let Some(mut task) = top_queue.pop_front() {
                                     task.recalculate_tokens(TaskConfiguration {
-                                        priority: top_index as usize,
+                                        weight: weight(top_index),
                                         total_weight,
                                     });
                                     expired.push(task, top_index);
@@ -95,13 +95,17 @@ impl RunQueue {
                                 priorities.remove(top_index);
                             }
 
+                            self.priorities = BitSet::new();
+                            self.len = 0;
+
                             return None;
                         }
                     };
+                    top_queue = &mut self.inner[top_index as usize];
                     vec_index = 0;
                 }
 
-                top_queue = &mut self.inner[top_index as usize];
+                vec_index += 1;
                 next_task = &top_queue[vec_index];
             }
 
@@ -119,7 +123,7 @@ impl RunQueue {
             self.len -= 1;
 
             next_task.recalculate_tokens(TaskConfiguration {
-                priority: top_index as usize,
+                weight: weight(top_index),
                 total_weight,
             });
             expired.push(next_task.clone(), top_index);
@@ -145,9 +149,9 @@ impl RunQueue {
     }
 
     #[inline]
-    pub(crate) fn remove(&mut self, task: &TaskRef) -> bool {
-        for i in self.priorities.iter() {
-            let queue = &mut self.inner[i];
+    pub(crate) fn remove(&mut self, task: &TaskRef) -> Option<usize> {
+        for priority in self.priorities.iter() {
+            let queue = &mut self.inner[priority];
 
             for j in 0..queue.len() {
                 let element = &queue[j];
@@ -157,14 +161,14 @@ impl RunQueue {
                     self.len -= 1;
 
                     if queue.is_empty() {
-                        self.priorities.remove(i as u8);
+                        self.priorities.remove(priority as u8);
                     }
 
-                    return true;
+                    return Some(weight(priority as u8));
                 }
             }
         }
-        false
+        None
     }
 
     /// Returns the priority of the given task.
@@ -187,6 +191,7 @@ impl RunQueue {
     /// run queue.
     #[inline]
     pub(crate) fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+        // FIXME: Recalculate weights.
         for i in self.priorities.iter() {
             let queue = &mut self.inner[i];
 
@@ -206,7 +211,8 @@ impl RunQueue {
                 }
             }
         }
-        false
+        // false
+        todo!();
     }
 
     #[inline]

@@ -58,9 +58,9 @@ impl Scheduler {
         }
     }
 
-    fn apply<F, R>(&mut self, f: F) -> R
+    fn apply<F, R>(&mut self, mut f: F) -> R
     where
-        F: Fn(&mut RunQueue) -> R,
+        F: FnMut(&mut RunQueue) -> R,
         R: Returnable,
     {
         let (first, second) = if self.active.len() >= self.expired.len() {
@@ -112,14 +112,16 @@ impl task::scheduler::Scheduler for Scheduler {
 
     #[inline]
     fn add(&mut self, task: TaskRef) {
-        let (task, weight) = EpochTaskRef::new(
+        let weight = weight(DEFAULT_PRIORITY);
+        self.total_weight += weight;
+
+        let task = EpochTaskRef::new(
             task,
             TaskConfiguration {
-                priority: DEFAULT_PRIORITY as usize,
+                weight,
                 total_weight: self.total_weight,
             },
         );
-        self.total_weight += weight;
         self.expired.push(task, DEFAULT_PRIORITY);
     }
 
@@ -130,7 +132,13 @@ impl task::scheduler::Scheduler for Scheduler {
 
     #[inline]
     fn remove(&mut self, task: &TaskRef) -> bool {
-        self.apply(|run_queue| run_queue.remove(task))
+        match self.apply(|run_queue| run_queue.remove(task)) {
+            Some(weight) => {
+                self.total_weight -= weight;
+                true
+            }
+            None => false,
+        }
     }
 
     #[inline]
@@ -145,6 +153,7 @@ impl task::scheduler::Scheduler for Scheduler {
 
         mem::swap(&mut self.active, &mut active);
         mem::swap(&mut self.expired, &mut expired);
+        self.total_weight = 0;
 
         Box::new(active.drain().chain(expired.drain()))
     }
@@ -172,6 +181,11 @@ impl task::scheduler::PriorityScheduler for Scheduler {
     }
 }
 
+#[inline]
+fn weight(priority: u8) -> usize {
+    priority as usize + 1
+}
+
 #[derive(Debug, Clone)]
 struct EpochTaskRef {
     task: TaskRef,
@@ -183,27 +197,26 @@ impl EpochTaskRef {
     ///
     /// Returns the task and the weight of the task.
     #[must_use]
-    pub(crate) fn new(task: TaskRef, config: TaskConfiguration) -> (Self, usize) {
+    pub(crate) fn new(task: TaskRef, config: TaskConfiguration) -> Self {
         let mut task = Self { task, tokens: 0 };
-        let weight = task.recalculate_tokens(config);
-        (task, weight)
+        task.recalculate_tokens(config);
+        task
     }
 
     #[inline]
-    pub(crate) fn recalculate_tokens(&mut self, config: TaskConfiguration) -> usize {
+    pub(crate) fn recalculate_tokens(&mut self, config: TaskConfiguration) {
         const TOTAL_TOKENS: usize = TARGET_LATENCY.as_micros() as usize
             / kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS as usize;
 
         // TODO
-        let weight = config.priority + 1;
-        self.tokens = core::cmp::max(TOTAL_TOKENS * weight / config.total_weight, 1);
-
-        weight
+        self.tokens = core::cmp::max(TOTAL_TOKENS * config.weight / config.total_weight, 1);
     }
 }
 
 pub(crate) struct TaskConfiguration {
-    pub(crate) priority: usize,
+    /// The weight of the task.
+    pub(crate) weight: usize,
+    /// The sum of the weights of all tasks on the run queue.
     pub(crate) total_weight: usize,
 }
 
