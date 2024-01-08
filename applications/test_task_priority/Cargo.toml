@@ -1,0 +1,15 @@
+[package]
+name = "test_task_priority"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Test for priority schedulers"
+edition = "2021"
+
+[dependencies]
+cpu = { path = "../../kernel/cpu" }
+fastrand = { version = "2.0.1", default-features = false }
+log = "0.4.8"
+preemption = { path = "../../kernel/preemption" }
+random = { path = "../../kernel/random" }
+spawn = { path = "../../kernel/spawn" }
+task = { path = "../../kernel/task" }
