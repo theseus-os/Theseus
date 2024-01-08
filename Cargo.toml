@@ -88,6 +88,7 @@ exclude = [
 	"applications/test_mlx5",
 	"applications/test_panic",
 	"applications/test_preemption_counter",
+	"applications/test_task_priority",
 	"applications/test_restartable",
 	"applications/test_scheduler",
 	"applications/test_std_fs",
