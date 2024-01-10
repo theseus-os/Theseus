@@ -14,11 +14,16 @@
 //! getting and setting the priorities of each task.
 
 #![no_std]
+#![feature(core_intrinsics)]
 
 extern crate alloc;
 
 use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
-use core::ops::{Deref, DerefMut};
+use core::{
+    intrinsics::likely,
+    ops::{Deref, DerefMut},
+};
+
 use task::TaskRef;
 
 const MAX_PRIORITY: u8 = 40;
@@ -40,37 +45,24 @@ impl Scheduler {
         }
     }
 
-    /// Moves the `TaskRef` at the given `index` in this scheduler's runqueue
-    /// to the end (back) of the runqueue.
-    ///
-    /// Sets the number of tokens for that task to the given `tokens`
-    /// and increments that task's number of context switches.
-    ///
-    /// Returns a cloned reference to the `TaskRef` at the given `index`.
-    fn update_and_move_to_end(&mut self, index: usize, tokens: usize) -> Option<TaskRef> {
-        if let Some(mut priority_task_ref) = self.queue.remove(index) {
-            priority_task_ref.tokens_remaining = tokens;
-            let task_ref = priority_task_ref.task.clone();
-            self.queue.push_back(priority_task_ref);
-            Some(task_ref)
-        } else {
-            None
-        }
-    }
-
     fn try_next(&mut self) -> Option<TaskRef> {
-        if let Some((task_index, _)) = self
-            .queue
-            .iter()
-            .enumerate()
-            .find(|(_, task)| task.is_runnable() && task.tokens_remaining > 0)
-        {
-            let chosen_task = self.queue.get(task_index).unwrap();
-            let modified_tokens = chosen_task.tokens_remaining.saturating_sub(1);
-            self.update_and_move_to_end(task_index, modified_tokens)
-        } else {
-            None
+        let len = self.queue.len();
+        let mut i = 0;
+
+        while i < len {
+            let mut task = self.queue.pop_front().unwrap();
+
+            if task.is_runnable() && task.tokens_remaining > 0 {
+                task.tokens_remaining -= 1;
+                self.queue.push_back(task.clone());
+                return Some(task.task);
+            } else if likely(!task.is_complete()) {
+                self.queue.push_back(task);
+            }
+            i += 1;
         }
+
+        None
     }
 
     fn assign_tokens(&mut self) {

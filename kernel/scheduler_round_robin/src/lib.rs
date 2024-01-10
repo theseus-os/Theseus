@@ -3,10 +3,12 @@
 //! This task is then moved to the back of the queue.
 
 #![no_std]
+#![feature(core_intrinsics)]
 
 extern crate alloc;
 
 use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
+use core::intrinsics::likely;
 
 use task::TaskRef;
 
@@ -26,18 +28,22 @@ impl Scheduler {
 
 impl task::scheduler::Scheduler for Scheduler {
     fn next(&mut self) -> TaskRef {
-        if let Some((task_index, _)) = self
-            .queue
-            .iter()
-            .enumerate()
-            .find(|(_, task)| task.is_runnable())
-        {
-            let task = self.queue.swap_remove_front(task_index).unwrap();
-            self.queue.push_back(task.clone());
-            task
-        } else {
-            self.idle_task.clone()
+        let len = self.queue.len();
+        let mut i = 0;
+
+        while i < len {
+            let task = self.queue.pop_front().unwrap();
+
+            if task.is_runnable() {
+                self.queue.push_back(task.clone());
+                return task;
+            } else if likely(!task.is_complete()) {
+                self.queue.push_back(task);
+            }
+            i += 1;
         }
+
+        self.idle_task.clone()
     }
 
     fn busyness(&self) -> usize {

@@ -397,8 +397,21 @@ impl Task {
     /// [`Runnable`]: RunState::Runnable
     /// [suspended]: Task::is_suspended
     /// [running]: Task::is_running
+    #[inline]
     pub fn is_runnable(&self) -> bool {
         self.runstate() == RunState::Runnable && !self.is_suspended()
+    }
+
+    /// Returns whether this `Task` is complete i.e. will never be runnable again.
+    ///
+    /// A task is complete if it is in an [`Exited`] or [`Reaped`] run state.
+    ///
+    /// [`Exited`]: RunState::Exited
+    /// [`Reaped`]: RunState::Reaped
+    #[inline]
+    pub fn is_complete(&self) -> bool {
+        let run_state = self.runstate();
+        run_state == RunState::Exited || run_state == RunState::Reaped
     }
 
     /// Returns the namespace that this `Task` is loaded/linked into and runs within.
