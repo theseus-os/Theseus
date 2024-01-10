@@ -3,7 +3,7 @@
 //! The types of interest are divided into three categories:
 //! 1. addresses: `VirtualAddress` and `PhysicalAddress`.
 //! 2. "chunk" types: `Page` and `Frame`.
-//! 3. ranges of chunks: `PageRange` and `FrameRange`.  
+//! 3. ranges of chunks: `PageRange` and `FrameRange`.
 
 #![no_std]
 #![feature(step_trait)]
@@ -100,9 +100,9 @@ macro_rules! implement_address {
 
             #[doc = "A " $desc " memory address, which is a `usize` under the hood."]
             #[derive(
-                Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-                Binary, Octal, LowerHex, UpperHex, 
-                BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+                Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+                Binary, Octal, LowerHex, UpperHex,
+                BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign,
                 Add, Sub, AddAssign, SubAssign,
                 FromBytes,
             )]
@@ -111,7 +111,7 @@ macro_rules! implement_address {
 
             impl $TypeName {
                 #[doc = "Creates a new `" $TypeName "`, returning an error if the address is not canonical.\n\n \
-                    This is useful for checking whether an address is valid before using it. 
+                    This is useful for checking whether an address is valid before using it.
                     For example, on x86_64, virtual addresses are canonical
                     if their upper bits `(64:48]` are sign-extended from bit 47,
                     and physical addresses are canonical if their upper bits `(64:52]` are 0."]
@@ -509,17 +509,26 @@ macro_rules! implement_page_frame {
                 }
             }
             impl From<$TypeName<Page1G>> for $TypeName<Page4K> {
-                fn from(p: $TypeName<Page1G>) -> Self { 
-                    Self {                             
+                fn from(p: $TypeName<Page1G>) -> Self {
+                    Self {
                         number: p.number,
                         size: PhantomData
                     }
                 }
             }
             impl From<$TypeName<Page2M>> for $TypeName<Page4K> {
-                fn from(p: $TypeName<Page2M>) -> Self { 
-                    Self {                             
+                fn from(p: $TypeName<Page2M>) -> Self {
+                    Self {
                         number: p.number,
+                        size: PhantomData
+                    }
+                }
+            }
+
+            impl<P: PageSize> $TypeName<P> {
+                pub fn convert_to_4k(&self) -> $TypeName<Page4K> {
+                    $TypeName {
+                        number: self.number,
                         size: PhantomData
                     }
                 }
@@ -564,7 +573,6 @@ impl<P: PageSize> Page<P> {
 macro_rules! implement_page_frame_range {
     ($TypeName:ident, $desc:literal, $short:ident, $chunk:ident, $address:ident) => {
         paste! { // using the paste crate's macro for easy concatenation
-                        
             #[doc = "A range of [`" $chunk "`]s that are contiguous in " $desc " memory."]
             #[derive(Clone, PartialEq, Eq)]
             pub struct $TypeName<P: PageSize = Page4K>(RangeInclusive<$chunk::<P>>);
@@ -737,6 +745,24 @@ macro_rules! implement_page_frame_range {
                     self.0.iter()
                 }
             }
+
+
+            #[doc = "A `" $TypeName "` that implements `Copy`."]
+            #[derive(Clone, Copy)]
+            pub struct [<Copyable $TypeName>]<P: PageSize = Page4K> {
+                start: $chunk<P>,
+                end: $chunk<P>,
+            }
+            impl<P: PageSize + Copy + 'static> From<$TypeName<P>> for [<Copyable $TypeName>]<P> {
+                fn from(r: $TypeName<P>) -> Self {
+                    Self { start: *r.start(), end: *r.end() }
+                }
+            }
+            impl<P: PageSize + Copy + 'static> From<[<Copyable $TypeName>]<P>> for $TypeName<P> {
+                fn from(cr: [<Copyable $TypeName>]<P>) -> Self {
+                    Self::new(cr.start, cr.end)
+              }
+           }
             impl<P: PageSize> IntoIterator for $TypeName<P> {
                 type Item = $chunk<P>;
                 type IntoIter = RangeInclusiveIterator<$chunk<P>>;
@@ -778,6 +804,230 @@ macro_rules! implement_page_frame_range {
                         ));
                     } else {
                         return Err("Could not convert 4KiB page range into 1GiB page range.");
+                    }
+                }
+            }
+
+            #[doc = "An enum used to wrap the generic `" $TypeName "` variants corresponding to different `" $chunk "` sizes. \
+            Additional methods are provided in order to destructure the enum variants."]
+            #[derive(Debug, Clone, PartialEq, Eq)]
+            pub enum [<$TypeName Sized>] {
+                Normal4KiB($TypeName),
+                Huge2MiB($TypeName<Page2M>),
+                Huge1GiB($TypeName<Page1G>),
+            }
+
+            impl [<$TypeName Sized>] {
+                #[doc = "Get the size of the pages for the contained `" $TypeName"` ."
+                pub fn page_size(&self) -> MemChunkSize {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.start().page_size()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.start().page_size()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.start().page_size()
+                        }
+                    }
+                }
+
+                #[doc = "Returns a reference to the contained `" $TypeName "` holding 4kb `" $chunk "`s. Returns None if called on a `" $TypeName "` holding huge pages."]
+                pub fn range(&self) -> Option<&$TypeName> {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            Some(pr)
+                        }
+                        _ => {
+                            None
+                        }
+                    }
+                }
+
+                #[doc = "range() equivalent for 2MiB memory ranges"]
+                pub fn range_2mb(&self) -> Result<$TypeName<Page2M>, &'static str> {
+                    match self {
+                        Self::Huge2MiB(pr) => {
+                            Ok(pr.clone())
+                        }
+                        _ => {
+                            Err("Called range_2mb on a $TypeName with a size other than 2mb")
+                        }
+                    }
+                }
+
+                #[doc = "range() equivalent for 1GiB memory ranges"]
+                pub fn range_1gb(&self) -> Result<$TypeName<Page1G>, &'static str> {
+                    match self {
+                        Self::Huge1GiB(pr) => {
+                            Ok(pr.clone())
+                        }
+                        _ => {
+                            Err("Called range_1gb on a $TypeName with a size other than 1gb")
+                        }
+                    }
+                }
+
+                pub fn contains(&self, page: &$chunk) -> bool {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.contains(page)
+                        }
+                        // 'page' is a 4kb chunk, so we need to perform a temporary conversion for other sizes
+                        Self::Huge2MiB(pr) => {
+                            let pr_4k = $TypeName::<Page4K>::from(pr.clone());
+                            pr_4k.contains(page)
+                        }
+                        Self::Huge1GiB(pr) => {
+                            let pr_4k = $TypeName::<Page4K>::from(pr.clone());
+                            pr_4k.contains(page)
+                        }
+                    }
+                }
+
+                pub const fn offset_of_address(&self, addr: $address) -> Option<usize> {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.offset_of_address(addr)
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.offset_of_address(addr)
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.offset_of_address(addr)
+                        }
+                    }
+                }
+
+                pub const fn address_at_offset(&self, offset: usize) -> Option<$address> {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.address_at_offset(offset)
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.address_at_offset(offset)
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.address_at_offset(offset)
+                        }
+                    }
+                }
+
+                #[doc = "Returns the starting `" $address "` in this range."]
+                pub fn start_address(&self) -> $address {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.start_address()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.start_address()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.start_address()
+                        }
+                    }
+                }
+
+                #[doc = "Returns the size in bytes of this range."]
+                pub fn size_in_bytes(&self) -> usize {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.size_in_bytes()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.size_in_bytes()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.size_in_bytes()
+                        }
+                    }
+                }
+
+                #[doc = "Returns the size, in number of `" $chunk "`s, of this range."]
+                pub fn [<size_in_ $chunk:lower s>](&self) -> usize {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.[<size_in_ $chunk:lower s>]()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.[<size_in_ $chunk:lower s>]()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.[<size_in_ $chunk:lower s>]()
+                        }
+                    }
+                }
+
+                #[doc = "Returns the starting `" $chunk" ` in this range. TODO: Find an alternative to panic when called on wrong size."
+                pub fn start(&self) -> &$chunk {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.start()
+                        }
+                        _ => {
+                            panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                #[doc = "Returns the ending `" $chunk "` (inclusive) in this range. TODO: Find an alternative to panic when called on wrong size."]
+                pub fn end(&self) -> &$chunk {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.end()
+                        }
+                        _ => {
+                            panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                #[doc = "start() equivalent for 2mb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
+                pub fn start_2m(&self) -> &$chunk<Page2M> {
+                    match self {
+                        Self::Huge2MiB(pr) => {
+                            pr.start()
+                        }
+                        _ => {
+                            panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                #[doc = "start() equivalent for 2mb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
+                pub fn end_2m(&self) -> &$chunk<Page2M> {
+                    match self {
+                        Self::Huge2MiB(pr) => {
+                            pr.end()
+                        }
+                        _ => {
+                            panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                #[doc = "start() equivalent for 1gb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
+                pub fn start_1g(&self) -> &$chunk<Page1G> {
+                    match self {
+                        Self::Huge1GiB(pr) => {
+                            pr.start()
+                        }
+                        _ => {
+                            panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                #[doc = "start() equivalent for 1gb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
+                pub fn end_1g(&self) -> &$chunk<Page1G> {
+                    match self {
+                        Self::Huge1GiB(pr) => {
+                            pr.end()
+                        }
+                        _ => {
+                            panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+                        }
                     }
                 }
             }
