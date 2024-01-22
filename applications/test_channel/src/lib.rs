@@ -291,6 +291,9 @@ fn sync_test_oneshot() -> Result<(), &'static str> {
     Ok(())
 }
 
+fn existence_of_this_function_causes_bug() -> Result<(), &'static str>{
+    Ok(())
+}
 
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
 fn sync_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
