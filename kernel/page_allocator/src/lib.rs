@@ -30,7 +30,7 @@ use intrusive_collections::Bound;
 mod static_array_rb_tree;
 // mod static_array_linked_list;
 
-use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
+use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}, convert::TryFrom};
 use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange, PageSize, Page4K, Page2M, Page1G};
 use spin::{Mutex, Once};
@@ -351,12 +351,48 @@ impl<P: PageSize> AllocatedPages<P> {
             AllocatedPages::<P> { pages: second },
         ))
     }
+
+	/// Returns the size of the pages in this page range.
+	pub fn page_size(&self) -> MemChunkSize {
+		self.pages.page_size()
+	}
+
+    /// Converts a range of 4kb `AllocatedPages` into a range of 2mb `AllocatedPages`.
+    pub fn to_2mb_allocated_pages(&mut self) {
+        self.pages = PageRangeSized::Huge2MiB(
+            PageRange::<Page2M>::try_from(
+                self.pages
+                    .range()
+                    .unwrap()
+                    .clone()).unwrap())
+    }
+
+    /// Converts a range of 4kb `AllocatedPages` into a range of 1gb `AllocatedPages`.
+    pub fn to_1gb_allocated_pages(&mut self) {
+        self.pages = PageRangeSized::Huge1GiB(
+            PageRange::<Page1G>::try_from(
+                self.pages
+                    .range()
+                    .unwrap()
+                    .clone()).unwrap())
+    }
 }
 
 impl<P: PageSize> Drop for AllocatedPages<P> {
     fn drop(&mut self) {
 		if self.size_in_pages() == 0 { return; }
 		// trace!("page_allocator: deallocating {:?}", self);
+
+		// Convert huge pages back to default size if needed.
+		let pages = match self.page_size() {
+			MemChunkSize::Normal4K => self.pages.range().unwrap().clone(),
+			MemChunkSize::Huge2M => { 
+				PageRange::<Page4K>::from(self.pages.range_2mb().unwrap())
+			},
+			MemChunkSize::Huge1G => { 
+				PageRange::<Page4K>::from(self.pages.range_1gb().unwrap())
+			}
+		};
 
 		let chunk = Chunk {
 			pages: self.pages.clone().into_4k_pages(),
@@ -917,6 +953,45 @@ pub fn allocate_pages_by_bytes_in_range(
 		.map(|(ap, _action)| ap)
 }
 
+/// Allocates the given number of 2MB huge pages with no constraints on the starting virtual address.
+/// 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+pub fn allocate_2mb_pages(num_pages: usize) -> Option<AllocatedPages> {
+    let huge_num_pages = num_pages * 512;
+	let ap = allocate_pages_deferred(AllocationRequest::AlignedTo { alignment_4k_pages: 512 }, huge_num_pages)
+		.map(|(ap, _action)| ap)
+		.ok();
+    match ap {
+        None => {
+            None
+        }
+        Some(mut p) => { // Since this function converts *this* AllocatedPages, it needs to be
+                         // mutable
+            p.to_2mb_allocated_pages();
+            Some(p)
+        }
+    }
+}
+
+/// Allocates the given number of 1GB huge pages with no constraints on the starting virtual address.
+/// 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+pub fn allocate_1gb_pages(num_pages: usize) -> Option<AllocatedPages> {
+    let huge_num_pages = num_pages * 512 * 512;
+	let ap = allocate_pages_deferred(AllocationRequest::AlignedTo { alignment_4k_pages: 512 * 512 }, huge_num_pages)
+		.map(|(ap, _action)| ap)
+		.ok();
+    match ap { 
+        None => {
+            None
+        }
+        Some(mut p) => { // Since this function converts *this* AllocatedPages, it needs to be
+                         // mutable
+            p.to_1gb_allocated_pages();
+            Some(p)
+        }
+    }
+}
 
 /// Converts the page allocator from using static memory (a primitive array) to dynamically-allocated memory.
 /// 

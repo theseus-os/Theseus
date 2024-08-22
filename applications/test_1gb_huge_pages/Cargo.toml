@@ -1,0 +1,16 @@
+[package]
+name = "test_1gb_huge_pages"
+version = "0.1.0"
+authors = ["Noah Mogensen <noah.mogen@protonmail.com>"]
+description = "Application for testing allocation, mapping, and memory access for 1gb huge pages."
+
+[dependencies]
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.app_io]
+path = "../../kernel/app_io"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"
