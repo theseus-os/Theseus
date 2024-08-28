@@ -34,7 +34,7 @@ mod static_array_rb_tree;
 use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, mem, ops::{Deref, DerefMut}};
 use intrusive_collections::Bound;
 use kernel_config::memory::*;
-use log::{error, warn, debug, trace};
+use log::{error, warn, debug, trace, info};
 use memory_structs::{PhysicalAddress, Frame, FrameRange, MemoryState, PageSize, Page4K, Page2M, Page1G};
 use spin::Mutex;
 use static_array_rb_tree::*;
@@ -196,31 +196,32 @@ fn check_and_add_free_region<P, R>(
     where P: Borrow<PhysicalMemoryRegion>,
           R: IntoIterator<Item = P> + Clone,
 {
+    let mut area = area.clone();
     // This will be set to the frame that is the start of the current free region. 
     let mut current_start = *area.start();
     // This will be set to the frame that is the end of the current free region. 
     let mut current_end = *area.end();
-    // trace!("looking at sub-area {:X?} to {:X?}", current_start, current_end);
+    trace!("looking at sub-area {:X?} to {:X?}", current_start, current_end);
 
     for reserved in reserved_physical_memory_areas.clone().into_iter() {
         let reserved = &reserved.borrow().frames;
-        // trace!("\t Comparing with reserved area {:X?}", reserved);
+        trace!("\t Comparing with reserved area {:X?}", reserved);
         if reserved.contains(&current_start) {
-            // info!("\t\t moving current_start from {:X?} to {:X?}", current_start, *reserved.end() + 1);
+            info!("\t\t moving current_start from {:X?} to {:X?}", current_start, *reserved.end() + 1);
             current_start = *reserved.end() + 1;
         }
         if &current_start <= reserved.start() && reserved.start() <= &current_end {
             // Advance up to the frame right before this reserved region started.
-            // info!("\t\t moving current_end from {:X?} to {:X?}", current_end, min(current_end, *reserved.start() - 1));
+            info!("\t\t moving current_end from {:X?} to {:X?}", current_end, min(current_end, *reserved.start() - 1));
             current_end = min(current_end, *reserved.start() - 1);
             if area.end() <= reserved.end() {
                 // Optimization here: the rest of the current area is reserved,
                 // so there's no need to keep iterating over the reserved areas.
-                // info!("\t !!! skipping the rest of the area");
+                info!("\t !!! skipping the rest of the area");
                 break;
             } else {
                 let after = FrameRange::new(*reserved.end() + 1, *area.end());
-                // warn!("moving on to after {:X?}", after);
+                warn!("moving on to after {:X?}", after);
                 // Here: the current area extends past this current reserved area,
                 // so there might be another free area that starts after this reserved area.
                 check_and_add_free_region(
@@ -229,11 +230,14 @@ fn check_and_add_free_region<P, R>(
                     free_list_idx,
                     reserved_physical_memory_areas.clone(),
                 );
+                area = FrameRange::new(*area.start(), current_end);
+                info!("Updating original region after exiting recursive function: {:X?}", area);
             }
         }
     }
 
     let new_area = FrameRange::new(current_start, current_end);
+    info!("Adding new area: {:X?}", new_area);
     if new_area.size_in_frames() > 0 {
         free_list[*free_list_idx] = Some(PhysicalMemoryRegion {
             typ:  MemoryRegionType::Free,
