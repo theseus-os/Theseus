@@ -34,7 +34,7 @@ mod static_array_rb_tree;
 use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, mem, ops::{Deref, DerefMut}};
 use intrusive_collections::Bound;
 use kernel_config::memory::*;
-use log::{error, warn, debug, trace, info};
+use log::{error, warn, debug, trace};
 use memory_structs::{PhysicalAddress, Frame, FrameRange, MemoryState, PageSize, Page4K, Page2M, Page1G};
 use spin::Mutex;
 use static_array_rb_tree::*;
