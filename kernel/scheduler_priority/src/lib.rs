@@ -1,11 +1,12 @@
 //! This scheduler implements a priority algorithm.
 
 #![no_std]
+#![feature(core_intrinsics)]
 
 extern crate alloc;
 
 use alloc::{boxed::Box, collections::BinaryHeap, vec::Vec};
-use core::cmp::Ordering;
+use core::{cmp::Ordering, intrinsics::likely};
 
 use task::TaskRef;
 use time::Instant;
@@ -39,7 +40,7 @@ impl task::scheduler::Scheduler for Scheduler {
                 task.last_ran = time::now::<time::Monotonic>();
                 self.queue.push(task.clone());
                 return task.task;
-            } else {
+            } else if likely(!task.task.is_complete()) {
                 blocked_tasks.push(task);
             }
         }

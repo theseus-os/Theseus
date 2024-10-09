@@ -155,7 +155,6 @@ impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
         // trace!("Finishing Bootstrap Task on core {}: {:?}", self.cpu_id, self.task_ref);
-        remove_current_task_from_runqueue(&self.exitable_taskref);
         self.exitable_taskref.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
 
@@ -996,11 +995,6 @@ where
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { core::hint::spin_loop() }
-}
-
-/// Helper function to remove a task from its runqueue and drop it.
-fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
-    task::scheduler::remove_task(current_task);
 }
 
 /// A basic idle task that does nothing but loop endlessly.
