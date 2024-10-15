@@ -19,7 +19,7 @@ We are continually working to improve the OS, including its fault recovery abili
 
 
 # Quick start
-On Linux (Debian-like distros), do the following:
+On Linux (Debian-like distros, non-Nix), do the following:
  1. Obtain the Theseus repository (with all submodules):    
     ```
     git clone --recurse-submodules --depth 1 https://github.com/theseus-os/Theseus.git
@@ -39,6 +39,22 @@ On Linux (Debian-like distros), do the following:
     ```
     To exit QEMU, press <kbd>Ctrl</kbd> + <kbd>A</kbd>, then <kbd>X</kbd>.
 
+On Linux (using Nix):
+1. Follow step 1 of the above to obtain the Theseus source.
+2. Cd into the source:
+    ```sh
+    cd Theseus
+    ```
+3. Enter the Nix shell from ./shell.nix:
+    ```sh
+    nix-shell
+    ```
+4. Build and run (like for ordinary Linux):
+    ```sh
+    make run
+    ```
+**Note:** Installing rustup is not necessary, and should not be done on Nix-based platforms, especially via the traditional rustup installation method. The Nix shell provided by [shell.nix](./shell.nix) will provide a functional, and even somewhat modular, Rust toolchain, fit for building and/or developing Theseus. See [NIX.md](./NIX.md) for more information.
+
 See below for more detailed instructions.
 
 
@@ -50,13 +66,16 @@ git submodule update --init --recursive
 
 Currently, we support building Theseus on the following platforms:
  * Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04, 18.04, 20.04. 
-   - Arch Linux and Fedora have also been reported to work correctly. 
+   - Arch Linux and Fedora have also been reported to work correctly.
+   - NixOS support is experimental, however, success has been verified for basic builds (with both GRUB and Limine), using the provided Nix shell [./shell.nix](./shell.nix).
  * Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version of WSL and WSL2.
  * MacOS, tested on versions High Sierra (v10.13), Catalina (v10.15), and Ventura (v13.5).
  * Docker, atop any host OS that can run a Docker container.
 
 
 ## Setting up the build environment
+
+**Note:** For Linux-Nix users, including NixOS, see the [NIX.md](./NIX.md) file for build instructions. For MacOS Nix users, out-of-the-box support is a major TODO. For WSL users, you may need to follow the extra, WSL-specific instructions below.
 
 First, install Rust by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html). On Linux, just run:
 ```sh
@@ -169,6 +188,8 @@ make run bootloader=limine
 ```
 Feel free to try newer versions, however they may not work.
 
+### Using Nix
+The above step is part of the Nix shell's setup when `bootloader` == `"limine"`. See [NIX.md](./NIX.md) for more.
 
 ## Targeting ARMv8 (aarch64)
 Support for Theseus on aarch64 is an ongoing effort, but most of the core subsystems are complete.
