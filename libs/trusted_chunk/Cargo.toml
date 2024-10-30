@@ -1,0 +1,14 @@
+[package]
+name = "trusted_chunk"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prusti-contracts = "^0.1"
+cfg-if = "1.0.0"
+range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
+spin = "0.9.4"
+
+[features]
+default = []
+std = []
