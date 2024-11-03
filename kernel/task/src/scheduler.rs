@@ -267,6 +267,11 @@ pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
     }
 }
 
+/// Returns whether the current scheduler supports priorities.
+pub fn supports_priority() -> bool {
+    SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().as_priority_scheduler().is_some())
+}
+
 /// A guard that lowers a task's priority back to its previous value when dropped.
 pub struct PriorityInheritanceGuard<'a> {
     inner: Option<(&'a TaskRef, u8)>,

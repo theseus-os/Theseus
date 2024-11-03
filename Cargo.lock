@@ -1130,6 +1130,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
+name = "fastrand"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
+
+[[package]]
 name = "fatfs"
 version = "0.4.0"
 source = "git+https://github.com/rafalh/rust-fatfs#87fc1ed5074a32b4e0344fcdde77359ef9e75432"
@@ -3910,6 +3916,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_task_priority"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "fastrand",
+ "log",
+ "preemption",
+ "random",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "test_thread_local"
 version = "0.1.0"
 dependencies = [
@@ -4035,6 +4054,7 @@ dependencies = [
  "test_std_fs",
  "test_sync_block",
  "test_task_cancel",
+ "test_task_priority",
  "test_thread_local",
  "test_tls",
  "test_wait_queue",
