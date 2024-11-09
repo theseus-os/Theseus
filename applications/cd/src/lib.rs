@@ -1,5 +1,6 @@
 #![no_std]
-#[macro_use] extern crate app_io;
+#[macro_use]
+extern crate app_io;
 // #[macro_use] extern crate log;
 
 extern crate alloc;
@@ -9,9 +10,12 @@ extern crate path;
 extern crate root;
 extern crate task;
 
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{
+    string::String,
+    sync::Arc,
+    vec::Vec,
+};
+
 use getopts::Options;
 
 pub fn main(args: Vec<String>) -> isize {

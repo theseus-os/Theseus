@@ -1,7 +1,8 @@
 #![no_std]
 
 extern crate task;
-#[macro_use] extern crate app_io;
+#[macro_use]
+extern crate app_io;
 extern crate alloc;
 extern crate fs_node;
 extern crate getopts;
@@ -12,7 +13,11 @@ use alloc::{
     vec::Vec,
 };
 use core::fmt::Write;
-use fs_node::{FileOrDir, DirRef};
+
+use fs_node::{
+    DirRef,
+    FileOrDir,
+};
 use getopts::Options;
 use path::Path;
 
@@ -26,7 +31,7 @@ pub fn main(args: Vec<String>) -> isize {
         Err(_f) => {
             println!("{}", _f);
             print_usage(opts);
-            return -1; 
+            return -1;
         }
     };
 
@@ -57,11 +62,14 @@ pub fn main(args: Vec<String>) -> isize {
             0
         }
         Some(FileOrDir::File(file)) => {
-            println!("'{}' is not a directory; `ls` currently only supports listing directory contents.", file.lock().get_name());
+            println!(
+                "'{}' is not a directory; `ls` currently only supports listing directory contents.",
+                file.lock().get_name()
+            );
             -1
         }
         _ => {
-            println!("Couldn't find path: {}", path); 
+            println!("Couldn't find path: {}", path);
             -1
         }
     }
@@ -69,7 +77,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn print_children(dir: &DirRef, print_size: bool) {
     let mut child_string = String::new();
-    let mut child_list = dir.lock().list(); 
+    let mut child_list = dir.lock().list();
     child_list.reverse();
     for child in child_list.iter() {
         let child_path = dir.lock().get(child).expect("Failed to get child path");
@@ -93,7 +101,6 @@ fn print_children(dir: &DirRef, print_size: bool) {
 fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
-
 
 const USAGE: &str = "Usage: ls [DIR | FILE]
 List the contents of the given directory or info about the given file.

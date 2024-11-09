@@ -1,10 +1,20 @@
 //! Shell job control.
 
+use alloc::{
+    string::String,
+    vec::Vec,
+};
 use core::fmt;
 
-use crate::{Error, Result};
-use alloc::{string::String, vec::Vec};
-use task::{KillReason, TaskRef};
+use task::{
+    KillReason,
+    TaskRef,
+};
+
+use crate::{
+    Error,
+    Result,
+};
 
 /// A shell job consisting of multiple parts.
 ///
@@ -89,9 +99,7 @@ impl core::cmp::PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
         matches!(
             (self, other),
-            (State::Done(_), State::Done(_))
-                | (State::Suspended, State::Suspended)
-                | (State::Running, State::Running)
+            (State::Done(_), State::Done(_)) | (State::Suspended, State::Suspended) | (State::Running, State::Running)
         )
     }
 }

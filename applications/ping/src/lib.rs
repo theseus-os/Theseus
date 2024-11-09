@@ -8,14 +8,33 @@
 
 extern crate alloc;
 
-use alloc::{string::String, vec, vec::Vec};
+use alloc::{
+    string::String,
+    vec,
+    vec::Vec,
+};
+use core::{
+    str::FromStr,
+    time::Duration,
+};
+
 use app_io::println;
-use core::{str::FromStr, time::Duration};
-use getopts::{Matches, Options};
+use getopts::{
+    Matches,
+    Options,
+};
 use net::{
-    icmp::{Endpoint, PacketBuffer, PacketMetadata, Socket},
+    icmp::{
+        Endpoint,
+        PacketBuffer,
+        PacketMetadata,
+        Socket,
+    },
     phy::ChecksumCapabilities,
-    wire::{Icmpv4Packet, Icmpv4Repr},
+    wire::{
+        Icmpv4Packet,
+        Icmpv4Repr,
+    },
     IpAddress,
 };
 use time::Instant;
@@ -24,18 +43,8 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optopt("c", "count", "stop after <count> replies", "<count>");
-    opts.optopt(
-        "i",
-        "wait",
-        "wait <wait> seconds between sending each packet (default: 1)",
-        "<wait>",
-    );
-    opts.optopt(
-        "s",
-        "packet size",
-        "send <size> data bytes in each packet (max: 248, default: 56)",
-        "<size>",
-    );
+    opts.optopt("i", "wait", "wait <wait> seconds between sending each packet (default: 1)", "<wait>");
+    opts.optopt("s", "packet size", "send <size> data bytes in each packet (max: 248, default: 56)", "<size>");
     opts.optopt(
         "t",
         "timeout",
@@ -67,8 +76,8 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn _main(matches: Matches) -> Result<(), &'static str> {
-    let remote = IpAddress::from_str(matches.free.first().ok_or("no arguments_provided")?)
-        .map_err(|_| "invalid argument")?;
+    let remote =
+        IpAddress::from_str(matches.free.first().ok_or("no arguments_provided")?).map_err(|_| "invalid argument")?;
 
     let interface = net::get_default_interface().ok_or("no network interfaces available")?;
 
@@ -106,11 +115,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
     let mut num_sent = 0;
     let mut num_received = 0;
 
-    let end = if let Some(timeout) = timeout {
-        Instant::now() + timeout
-    } else {
-        Instant::MAX
-    };
+    let end = if let Some(timeout) = timeout { Instant::now() + timeout } else { Instant::MAX };
     let mut last_sent = Instant::ZERO;
 
     loop {
@@ -133,11 +138,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
 
         if can_send && num_sent < count && last_sent + wait <= now {
             last_sent = now;
-            let repr = Icmpv4Repr::EchoRequest {
-                ident: 0x22b,
-                seq_no: num_sent,
-                data: &data,
-            };
+            let repr = Icmpv4Repr::EchoRequest { ident: 0x22b, seq_no: num_sent, data: &data };
 
             let mut locked = socket.lock();
             let payload = locked
@@ -156,8 +157,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
         if can_recv {
             let mut locked = socket.lock();
             let (payload, _) = locked.recv().map_err(|_| "failed to receive packet")?;
-            let packet = Icmpv4Packet::new_checked(&payload)
-                .map_err(|_| "incoming packet had incorrect length")?;
+            let packet = Icmpv4Packet::new_checked(&payload).map_err(|_| "incoming packet had incorrect length")?;
             let repr = Icmpv4Repr::parse(&packet, &ChecksumCapabilities::ignored())
                 .map_err(|_| "failed to parse incoming packet")?;
 

@@ -1,28 +1,37 @@
 #![no_std]
 extern crate alloc;
-#[macro_use] extern crate app_io;
+#[macro_use]
+extern crate app_io;
 // #[macro_use] extern crate debugit;
 
-extern crate task;
 extern crate getopts;
+extern crate task;
+
+use alloc::{
+    string::{
+        String,
+        ToString,
+    },
+    vec::Vec,
+};
 
 use getopts::Options;
-use alloc::vec::Vec;
-use alloc::string::{String, ToString};
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
-    
+
     opts.optflag("h", "help", "print this help menu");
-    opts.optflag("r", "reap", 
-        "reap the task (consume its exit value) in addition to killing it, removing it from the task list."
+    opts.optflag(
+        "r",
+        "reap",
+        "reap the task (consume its exit value) in addition to killing it, removing it from the task list.",
     );
 
     let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
-            return -1; 
+            return -1;
         }
     };
 
@@ -47,12 +56,12 @@ pub fn main(args: Vec<String>) -> isize {
                         return -1;
                     }
                 }
-            }, 
-            _ => { 
-                println!("Invalid argument {}, not a valid task ID (usize)", task_id_str); 
+            },
+            _ => {
+                println!("Invalid argument {}, not a valid task ID (usize)", task_id_str);
                 return -1;
             },
-        };   
+        };
     }
     0
 }
@@ -62,12 +71,12 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
     if let Some(task_ref) = task::get_task(task_id) {
         if task_ref.kill(task::KillReason::Requested)
             .and_then(|_| runqueue::remove_task_from_all(&task_ref))
-            .is_ok() 
+            .is_ok()
         {
             println!("Killed task {}", &*task_ref);
             if reap {
                 match task_ref.take_exit_value() {
-                    Some(exit_val) => { 
+                    Some(exit_val) => {
                         println!("Reaped task {}, got exit value {}", task_id, debugit!(exit_val));
                         Ok(())
                     }
@@ -75,7 +84,7 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
                         Err(format!("Failed to reap task {}", task_id))
                     }
                 }
-            } 
+            }
             else {
                 // killed the task successfully, no reap request, so return success.
                 Ok(())
@@ -110,4 +119,3 @@ fn print_usage(opts: Options) -> isize {
     println!("{}", opts.usage(&brief));
     0
 }
-
