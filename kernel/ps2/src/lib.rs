@@ -445,30 +445,37 @@ impl<'c> PS2Mouse<'c> {
             .map_err(|_| "failed to set the mouse resolution")
     }
 
-    /// read the correct [MousePacket] according to [MouseId]
-    pub fn read_mouse_packet(&self) -> MousePacket {
-        let read_data = || self.controller.read_data();
+    /// construct the correct [MousePacket] according to [MouseId]
+    pub fn packet_from_bytes(&self, bytes: [u8; 4]) -> MousePacket {
         match self.id {
             MouseId::Zero => MousePacket::Zero(
-                MousePacketGeneric::from_bytes([
-                    read_data(), read_data(), read_data()
-                ])
+                MousePacketGeneric::from_bytes([bytes[0], bytes[1], bytes[2]])
             ),
             MouseId::Three => MousePacket::Three(
-                MousePacket3::from_bytes([
-                    read_data(), read_data(), read_data(), read_data()
-                ])
+                MousePacket3::from_bytes(bytes)
             ),
             MouseId::Four => MousePacket::Four(
-                MousePacket4::from_bytes([
-                    read_data(), read_data(), read_data(), read_data()
-                ])
+                MousePacket4::from_bytes(bytes)
             ),
         }
     }
 
-    /// Returns `true` if there is content in the PS/2 Mouse's output buffer
-    /// that can be read from.
+    /// read one byte of mouse packet from the PS/2 data port
+    pub fn read_packet_byte(&self) -> u8 {
+        self.controller.read_data()
+    }
+
+    /// get the mouse packet size corresponding to the mouse id
+    pub fn packet_size(&self) -> usize {
+        match self.id {
+            MouseId::Zero => 3,
+            _ => 4,
+        }
+    }
+
+    /// Convenience method to see if the mouse can be polled
+    /// 
+    /// Returns `true` if there is content in the PS/2 Mouse's output buffer.
     /// 
     /// This also checks the status register's `output_buffer_full` bit.
     /// Otherwise `mouse_id` would read ACK (0xFA) instead of mouse id.
@@ -614,6 +621,8 @@ impl<'c> PS2Keyboard<'c> {
     }
 
     /// Convenience method to see if the keyboard can be polled
+    /// 
+    /// Note: we don't need to check !mouse_output_buffer_full().
     fn is_output_buffer_full(&self) -> bool {
         self.controller.status_register().output_buffer_full()
     }
