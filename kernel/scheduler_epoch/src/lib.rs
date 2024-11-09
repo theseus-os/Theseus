@@ -1,34 +1,49 @@
-//! This crate implements a token-based epoch scheduling policy.
+//! A token-based epoch scheduler.
 //!
-//! At the begining of each scheduling epoch, a set of tokens is distributed
-//! among all runnable tasks, based on their priority relative to all other
-//! runnable tasks in the runqueue. The formula for this is:
-//! ```ignore
-//! tokens_assigned_to_task_i = (priority_task_i / sum_priority_all_tasks) * epoch_length;
-//! ```
-//! * Each time a task is picked, its token count is decremented by 1.
-//! * A task can only be selected for next execution if it has tokens remaining.
-//! * When all tokens of all runnable task are exhausted, a new scheduling epoch begins.
+//! The implementation is based on the [`O(1)` Linux
+//! scheduler][linux-scheduler].
 //!
-//! This epoch scheduler is also a priority-based scheduler, so it allows
-//! getting and setting the priorities of each task.
+//! The scheduler is comprised of two run queues: an .
+//!
+//! Note that our implementation is not constant-time since we store
+//! non-runnable tasks on the run queue.
+//!
+//! [linux-scheduler]: https://litux.nl/mirror/kerneldevelopment/0672327201/ch04lev1sec2.html
 
 #![no_std]
+#![feature(core_intrinsics)]
+
+mod queue;
 
 extern crate alloc;
 
-use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
-use core::ops::{Deref, DerefMut};
+use alloc::{boxed::Box, vec::Vec};
+use core::{
+    mem,
+    ops::{Deref, DerefMut},
+    time::Duration,
+};
+
 use task::TaskRef;
 
-const MAX_PRIORITY: u8 = 40;
-const DEFAULT_PRIORITY: u8 = 20;
-const INITIAL_TOKENS: usize = 10;
+use crate::queue::RunQueue;
 
-/// An instance of an epoch scheduler, typically one per CPU.
+const MAX_PRIORITY: u8 = 63;
+const DEFAULT_PRIORITY: u8 = 20;
+
+/// The minimum amount of time for every runnable task to run.
+///
+/// This is not strictly adhered to when the tasks are run
+const TARGET_LATENCY: Duration = Duration::from_millis(15);
+
+/// An epoch scheduler.
+///
+/// See crate-level docs for more information.
 pub struct Scheduler {
     idle_task: TaskRef,
-    queue: VecDeque<EpochTaskRef>,
+    active: RunQueue,
+    expired: RunQueue,
+    total_weight: usize,
 }
 
 impl Scheduler {
@@ -36,188 +51,194 @@ impl Scheduler {
     pub const fn new(idle_task: TaskRef) -> Self {
         Self {
             idle_task,
-            queue: VecDeque::new(),
+            active: RunQueue::new(),
+            expired: RunQueue::new(),
+            // TODO: 0 or 1
+            total_weight: 0,
         }
     }
 
-    /// Moves the `TaskRef` at the given `index` in this scheduler's runqueue
-    /// to the end (back) of the runqueue.
-    ///
-    /// Sets the number of tokens for that task to the given `tokens`
-    /// and increments that task's number of context switches.
-    ///
-    /// Returns a cloned reference to the `TaskRef` at the given `index`.
-    fn update_and_move_to_end(&mut self, index: usize, tokens: usize) -> Option<TaskRef> {
-        if let Some(mut priority_task_ref) = self.queue.remove(index) {
-            priority_task_ref.tokens_remaining = tokens;
-            let task_ref = priority_task_ref.task.clone();
-            self.queue.push_back(priority_task_ref);
-            Some(task_ref)
+    fn apply<F, R>(&mut self, mut f: F) -> R
+    where
+        F: FnMut(&mut RunQueue) -> R,
+        R: Returnable,
+    {
+        let (first, second) = if self.active.len() >= self.expired.len() {
+            (&mut self.active, &mut self.expired)
         } else {
-            None
-        }
-    }
+            (&mut self.expired, &mut self.active)
+        };
 
-    fn try_next(&mut self) -> Option<TaskRef> {
-        if let Some((task_index, _)) = self
-            .queue
-            .iter()
-            .enumerate()
-            .find(|(_, task)| task.is_runnable() && task.tokens_remaining > 0)
-        {
-            let chosen_task = self.queue.get(task_index).unwrap();
-            let modified_tokens = chosen_task.tokens_remaining.saturating_sub(1);
-            self.update_and_move_to_end(task_index, modified_tokens)
+        let first_result = f(first);
+
+        if first_result.should_return() {
+            first_result
         } else {
-            None
-        }
-    }
-
-    fn assign_tokens(&mut self) {
-        // We begin with total priorities = 1 to avoid division by zero
-        let mut total_priorities: usize = 1;
-
-        // This loop calculates the total priorities of the runqueue
-        for (_i, t) in self.queue.iter().enumerate() {
-            // we assign tokens only to runnable tasks
-            if !t.is_runnable() {
-                continue;
-            }
-
-            total_priorities = total_priorities
-                .saturating_add(1)
-                .saturating_add(t.priority as usize);
-        }
-
-        // Each epoch lasts for a total of 100 tokens by default.
-        // However, as this granularity could skip over low priority tasks
-        // when many concurrent tasks are running, we increase the epoch in such cases.
-        let epoch: usize = core::cmp::max(total_priorities, 100);
-
-        for (_i, t) in self.queue.iter_mut().enumerate() {
-            // we give zero tokens to the idle tasks
-            if t.is_an_idle_task {
-                continue;
-            }
-
-            // we give zero tokens to non-runnable tasks
-            if !t.is_runnable() {
-                continue;
-            }
-
-            // task_tokens = epoch * (taskref + 1) / total_priorities;
-            let task_tokens = epoch
-                .saturating_mul((t.priority as usize).saturating_add(1))
-                .wrapping_div(total_priorities);
-
-            t.tokens_remaining = task_tokens;
-            // debug!("assign_tokens(): CPU {} chose Task {:?}", cpu_id, &*t);
+            f(second)
         }
     }
 }
 
+trait Returnable {
+    fn should_return(&self) -> bool;
+}
+
+impl Returnable for bool {
+    fn should_return(&self) -> bool {
+        *self
+    }
+}
+
+impl<T> Returnable for Option<T> {
+    fn should_return(&self) -> bool {
+        self.is_some()
+    }
+}
+
 impl task::scheduler::Scheduler for Scheduler {
+    #[inline]
     fn next(&mut self) -> TaskRef {
-        self.try_next()
-            .or_else(|| {
-                self.assign_tokens();
-                self.try_next()
-            })
-            .unwrap_or_else(|| self.idle_task.clone())
-    }
-
-    fn add(&mut self, task: TaskRef) {
-        let priority_task_ref = EpochTaskRef::new(task);
-        self.queue.push_back(priority_task_ref);
-    }
-
-    fn busyness(&self) -> usize {
-        self.queue.len()
-    }
-
-    fn remove(&mut self, task: &TaskRef) -> bool {
-        let mut task_index = None;
-        for (i, t) in self.queue.iter().enumerate() {
-            if **t == *task {
-                task_index = Some(i);
-                break;
+        if self.active.is_empty() {
+            if !self.expired.is_empty() {
+                mem::swap(&mut self.active, &mut self.expired);
+            } else {
+                return self.idle_task.clone();
             }
         }
+        self.active
+            .next(&mut self.expired, self.total_weight)
+            .unwrap_or(self.idle_task.clone())
+    }
 
-        if let Some(task_index) = task_index {
-            self.queue.remove(task_index);
-            true
-        } else {
-            false
+    #[inline]
+    fn add(&mut self, task: TaskRef) {
+        let weight = weight(DEFAULT_PRIORITY);
+        self.total_weight += weight;
+
+        let task = EpochTaskRef::new(
+            task,
+            TaskConfiguration {
+                weight,
+                total_weight: self.total_weight,
+            },
+        );
+        self.expired.push(task, DEFAULT_PRIORITY);
+    }
+
+    #[inline]
+    fn busyness(&self) -> usize {
+        self.active.len() + self.expired.len()
+    }
+
+    #[inline]
+    fn remove(&mut self, task: &TaskRef) -> bool {
+        match self.apply(|run_queue| run_queue.remove(task)) {
+            Some(weight) => {
+                self.total_weight -= weight;
+                true
+            }
+            None => false,
         }
     }
 
+    #[inline]
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler::PriorityScheduler> {
         Some(self)
     }
 
+    #[inline]
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_> {
-        Box::new(self.queue.drain(..).map(|epoch_task| epoch_task.task))
+        let mut active = RunQueue::new();
+        let mut expired = RunQueue::new();
+
+        mem::swap(&mut self.active, &mut active);
+        mem::swap(&mut self.expired, &mut expired);
+        self.total_weight = 0;
+
+        Box::new(active.drain().chain(expired.drain()))
     }
 
+    #[inline]
     fn tasks(&self) -> Vec<TaskRef> {
-        self.queue
+        self.active
             .clone()
-            .into_iter()
-            .map(|epoch_task| epoch_task.task)
+            .drain()
+            .chain(self.expired.clone().drain())
             .collect()
     }
 }
 
 impl task::scheduler::PriorityScheduler for Scheduler {
+    #[inline]
     fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
         let priority = core::cmp::min(priority, MAX_PRIORITY);
-        for epoch_task in self.queue.iter_mut() {
-            if epoch_task.task == *task {
-                epoch_task.priority = priority;
-                return true;
-            }
-        }
-        false
+        self.apply(|run_queue| run_queue.set_priority(task, priority))
     }
 
+    #[inline]
     fn priority(&mut self, task: &TaskRef) -> Option<u8> {
-        for epoch_task in self.queue.iter() {
-            if epoch_task.task == *task {
-                return Some(epoch_task.priority);
-            }
-        }
-        None
+        self.apply(|run_queue| run_queue.priority(task))
     }
+}
+
+#[inline]
+fn weight(priority: u8) -> usize {
+    priority as usize + 1
 }
 
 #[derive(Debug, Clone)]
 struct EpochTaskRef {
     task: TaskRef,
-    priority: u8,
-    tokens_remaining: usize,
+    tokens: usize,
+}
+
+impl EpochTaskRef {
+    /// Creates a new task.
+    ///
+    /// Returns the task and the weight of the task.
+    #[must_use]
+    pub(crate) fn new(task: TaskRef, config: TaskConfiguration) -> Self {
+        let mut task = Self { task, tokens: 0 };
+        task.recalculate_tokens(config);
+        task
+    }
+
+    #[inline]
+    pub(crate) fn recalculate_tokens(&mut self, config: TaskConfiguration) {
+        const TOTAL_TOKENS: usize = TARGET_LATENCY.as_micros() as usize
+            / kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS as usize;
+
+        // TODO
+        self.tokens = core::cmp::max(TOTAL_TOKENS * config.weight / config.total_weight, 1);
+    }
+}
+
+pub(crate) struct TaskConfiguration {
+    /// The weight of the task.
+    pub(crate) weight: usize,
+    /// The sum of the weights of all tasks on the run queue.
+    pub(crate) total_weight: usize,
 }
 
 impl Deref for EpochTaskRef {
     type Target = TaskRef;
 
+    #[inline]
     fn deref(&self) -> &TaskRef {
         &self.task
     }
 }
 
 impl DerefMut for EpochTaskRef {
+    #[inline]
     fn deref_mut(&mut self) -> &mut TaskRef {
         &mut self.task
     }
 }
 
-impl EpochTaskRef {
-    fn new(task: TaskRef) -> EpochTaskRef {
-        EpochTaskRef {
-            task,
-            priority: DEFAULT_PRIORITY,
-            tokens_remaining: INITIAL_TOKENS,
-        }
+impl From<EpochTaskRef> for TaskRef {
+    #[inline]
+    fn from(value: EpochTaskRef) -> Self {
+        value.task
     }
 }
