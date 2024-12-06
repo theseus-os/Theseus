@@ -44,6 +44,7 @@ use core2::io::Write;
 use core::ops::Deref;
 use app_io::IoStreams;
 use fs_node::FileOrDir;
+use core::str;
 
 /// The status of a job.
 #[derive(PartialEq)]
@@ -135,7 +136,15 @@ enum AppErr {
     SpawnErr(String)
 }
 
-struct Shell {
+/// This bundles start and end index char into one structure
+struct LineSlice {
+    // The starting index in the String for a line. (inclusive)
+    start: usize,
+    // The ending index in the String for a line. (exclusive)
+    end: usize
+}
+
+pub struct Shell {
     /// Variable that stores the task id of any application manually spawned from the terminal
     jobs: BTreeMap<isize, Job>,
     /// Map task number to job number.
@@ -166,7 +175,15 @@ struct Shell {
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
-    terminal: Arc<Mutex<Terminal>>
+    terminal: Arc<Mutex<Terminal>>,
+    /// The indicator to show "text editing" mode
+    less: bool,
+    // String to store file
+    content: String,
+    // BTree Map to keep track of file new line indices
+    map: BTreeMap<usize, LineSlice>,
+    // Line to start the display
+    line_start: usize
 }
 
 impl Shell {
@@ -202,7 +219,11 @@ impl Shell {
             print_consumer,
             print_producer,
             env: Arc::new(Mutex::new(env)),
-            terminal
+            terminal,
+            less: false,
+            content: String::new(),
+            map: BTreeMap::new(),
+            line_start: 0
         })
     }
 
@@ -483,6 +504,32 @@ impl Shell {
             if self.fg_job_num.is_none() {
                 self.complete_cmdline()?;
             }
+            return Ok(());
+        }
+
+        // Check if the Q key is pressed and exit from 'less' mode
+        if keyevent.keycode == Keycode::Q && self.less{
+            self.less = false;
+            self.terminal.lock().clear();
+            self.redisplay_prompt();
+            return Ok(());
+        }
+
+        // Check if the Up key is pressed and scroll up in 'less' mode
+        if  keyevent.keycode == Keycode::Up && self.less {
+            if self.line_start > 0 {
+                self.line_start -= 1;
+            }
+            self.display_content_slice()?;
+            return Ok(());
+        }
+
+        // Check if the Down key is pressed and scroll down in 'less' mode
+        if  keyevent.keycode == Keycode::Down && self.less {
+            if self.line_start + 1 < self.map.len() {
+                self.line_start += 1;
+            }
+            self.display_content_slice()?;
             return Ok(());
         }
 
@@ -1161,11 +1208,13 @@ impl Shell {
 
     /// Redisplays the terminal prompt (does not insert a newline before it)
     fn redisplay_prompt(&mut self) {
-        let curr_env = self.env.lock();
-        let mut prompt = curr_env.working_dir.lock().get_absolute_path();
-        prompt = format!("{prompt}: ");
-        self.terminal.lock().print_to_terminal(prompt);
-        self.terminal.lock().print_to_terminal(self.cmdline.clone());
+        if !self.less {
+            let curr_env = self.env.lock();
+            let mut prompt = curr_env.working_dir.lock().get_absolute_path();
+            prompt = format!("{prompt} : ");
+            self.terminal.lock().print_to_terminal(prompt);
+            self.terminal.lock().print_to_terminal(self.cmdline.clone());
+        }
     }
 
     /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
@@ -1344,6 +1393,7 @@ impl Shell {
                 "fg" => return true,
                 "bg" => return true,
                 "clear" => return true,
+                "less" => return true,
                 _ => return false
             }
         }
@@ -1361,10 +1411,143 @@ impl Shell {
                 "fg" => self.execute_internal_fg(),
                 "bg" => self.execute_internal_bg(),
                 "clear" => self.execute_internal_clear(),
+                "less" => self.execute_internal_less(iter.collect()),
                 _ => Ok(())
             }
         } else {
             Ok(())
+        }
+    }
+
+    /// Executes the 'less' internal command to display the content of a file.
+    fn execute_internal_less(&mut self, args: Vec<&str>) -> Result<(), &'static str> {
+        if args.is_empty() {
+            self.terminal.lock().print_to_terminal("not enough arguments provided.\n".to_string());
+            self.clear_cmdline(false)?;
+            self.redisplay_prompt();
+            return Ok(())
+        }
+
+        let file_path = args[0];
+        self.less = true;
+        let _ = self.get_content_string(file_path.to_string());
+        self.terminal.lock().clear();
+        self.clear_cmdline(false)?;
+        self.parse_content();
+        self.display_content_slice()?;
+        self.redisplay_prompt();
+        Ok(())
+    }
+ 
+    
+    /// Display part of the file (may be whole file if the file is short) to the terminal, indicated
+    /// by line_start attribute
+    fn display_content_slice(&mut self) -> Result<(), &'static str> {
+        // Calculate the last line to display. Make sure we don't extend over the end of the file.
+        let (_width, height) = self.terminal.lock().get_text_dimensions();
+        let mut line_end: usize = self.line_start + (height - 20); 
+        
+        if self.map.len() < line_end {
+            line_end = self.map.len();
+        }
+
+        // Refresh the terminal with the lines we've selected.
+        let start_indices = match self.map.get(&self.line_start) {
+            Some(indices) => indices,
+                None => return Err("failed to get the byte indices of the first line")
+        };
+        
+        let end_indices = match self.map.get(&(line_end - 1)) {
+            Some(indices) => indices,
+            None => return Err("failed to get the byte indices of the last line")
+        };
+
+        self.terminal.lock().clear();
+        self.terminal.lock().print_to_terminal(
+            self.content[start_indices.start..end_indices.end].to_string()
+        );
+        self.terminal.lock().refresh_display()
+    }
+
+    /// This function parses the text file. It scans through the whole file and records the string slice
+    /// for each line. It stores index of each starting and ending char position of each line (separated by '\n)
+    fn parse_content(&mut self) {
+        // Get the width and height of the terminal screen.
+        let (width, _) = self.terminal.lock().get_text_dimensions();
+   
+        // Number of the current line.
+        let mut cur_line_num: usize = 0;
+        // Number of characters in the current line.
+        let mut char_num_in_line: usize = 0;
+        // Starting index in the String of the current line.
+        let mut line_start_idx: usize = 0;
+        // The previous character during the iteration. Set '\0' as the initial value since we don't expect
+        // to encounter this character in the beginning of the file.
+        let mut previous_char: char = '\0';
+        // Clear contents in map
+        self.map.clear();
+
+        // Iterate through the whole file.
+        // `c` is the current character. `str_idx` is the index of the first byte of the current character.
+        for (str_idx, c) in self.content.char_indices() {
+            // When we need to begin a new line, record the previous line in the map.
+            if char_num_in_line == width || previous_char == '\n' {
+                self.map.insert(cur_line_num, LineSlice{ start: line_start_idx, end: str_idx });
+                char_num_in_line = 0;
+                line_start_idx = str_idx;
+                cur_line_num += 1;
+            }
+            char_num_in_line += 1;
+            previous_char = c;
+        }
+        self.map.insert(cur_line_num, LineSlice{ start: line_start_idx, end: self.content.len() });
+    }
+
+    /// Stores the entire file as a string to be parsed by 'less' operation
+    fn get_content_string(&mut self, file_path: String) -> Result<String, String> {
+        let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+            return Err("failed to get current task".to_string());
+        };
+
+        let prompt = self.env.lock().working_dir.lock().get_absolute_path();
+        let full_path = format!("{}/{}", prompt, file_path);
+        let path = Path::new(full_path.as_str());
+        
+        // navigate to the filepath specified by first argument
+        match path.get(&curr_wd) {
+    
+            Some(file_dir_enum) => {
+                match file_dir_enum {
+                    FileOrDir::Dir(directory) => {
+                        Err(format!("{:?} a directory, cannot 'less' non-files.", directory.lock().get_name()))
+                    }
+                    FileOrDir::File(file) => {
+                        let mut file_locked = file.lock();
+                        let file_size = file_locked.len();
+                        let mut string_slice_as_bytes = vec![0; file_size];
+                        let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes, 0) {
+                            Ok(num) => num,
+                            Err(e) => {
+                                self.terminal.lock().print_to_terminal("Failed to read error ".to_string());
+                                return Err(format!("Failed to file size: {:?}", e));
+                            }
+                        };
+                        let read_string = match str::from_utf8(&string_slice_as_bytes) {
+                            Ok(string_slice) => string_slice,
+                            Err(utf8_err) => {
+                                self.terminal.lock().print_to_terminal("File was not a printable UTF-8 text file".to_string());
+                                return Err(format!("Failed to read file: {:?}", utf8_err));
+                            }
+                        };
+                        self.content = read_string.to_string();
+                        Ok(read_string.to_string())
+                    }
+                }
+            },
+            None => {
+                self.terminal.lock().print_to_terminal(format!("Path not found: {}\n", path).to_string());
+                Ok("File not found".to_string()) 
+            }
         }
     }
 
