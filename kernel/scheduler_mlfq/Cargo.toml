@@ -1,0 +1,13 @@
+[package]
+name = "scheduler_mlfq"
+description = "Provides a multi-level feedback queue (MLFQ) scheduler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.8"
+task = { path = "../task" }
+time = { path = "../time" }
+
+[lib]
+crate-type = ["rlib"]

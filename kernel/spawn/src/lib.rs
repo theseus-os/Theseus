@@ -64,6 +64,8 @@ pub fn init(
             let scheduler = scheduler_epoch::Scheduler::new(idle_task);
         } else if #[cfg(priority_scheduler)] {
             let scheduler = scheduler_priority::Scheduler::new(idle_task);
+        } else if #[cfg(mlfq_scheduler)] {
+            let scheduler = scheduler_mlfq::Scheduler::new(idle_task);
         } else {
             let scheduler = scheduler_round_robin::Scheduler::new(idle_task);
         }
