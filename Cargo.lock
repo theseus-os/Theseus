@@ -3153,8 +3153,18 @@ dependencies = [
  "app_io",
  "cpu",
  "getopts",
+ "log",
  "scheduler",
  "spawn",
+ "time",
+]
+
+[[package]]
+name = "scheduler_mlfq"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "task",
  "time",
 ]
 
@@ -3446,6 +3456,7 @@ dependencies = [
  "preemption",
  "scheduler",
  "scheduler_epoch",
+ "scheduler_mlfq",
  "scheduler_priority",
  "scheduler_round_robin",
  "spin 0.9.4",

@@ -29,6 +29,7 @@ pub use task::scheduler::{inherit_priority, priority, schedule, set_priority};
 /// - `make`: round-robin scheduler
 /// - `make THESEUS_CONFIG=epoch_scheduler`: epoch scheduler
 /// - `make THESEUS_CONFIG=priority_scheduler`: priority scheduler
+/// - `make THESEUS_CONFIG=mlfq_scheduler`: multi-level feedback queue scheduler
 pub fn init() -> Result<(), &'static str> {
     #[cfg(target_arch = "x86_64")] {
         interrupts::register_interrupt(

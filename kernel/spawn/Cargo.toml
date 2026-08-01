@@ -32,6 +32,7 @@ early_tls = { path = "../early_tls" }
 scheduler_epoch = { path = "../scheduler_epoch" }
 scheduler_priority = { path = "../scheduler_priority" }
 scheduler_round_robin = { path = "../scheduler_round_robin" }
+scheduler_mlfq = { path = "../scheduler_mlfq" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 fault_crate_swap = { path = "../fault_crate_swap" }
