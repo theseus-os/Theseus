@@ -46,7 +46,6 @@ use queue_registers::*;
 
 use spin::Once;
 use alloc::{
-    boxed::Box,
     collections::VecDeque,
     sync::Arc,
     vec::Vec,
@@ -66,7 +65,6 @@ use rand::{
     RngCore,
     rngs::SmallRng
 };
-use core::mem::ManuallyDrop;
 use hashbrown::HashMap;
 
 /// Vendor ID for Intel
@@ -103,6 +101,20 @@ pub const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 64;
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
 /// most likely because they need additional configuration.
 pub const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
+
+
+/*** Hardware polling limits ***/
+
+/// The maximum number of times we poll a register while waiting for the NIC to
+/// carry out an action we just requested, e.g. enabling one of its queues.
+///
+/// A healthy device sets these bits almost immediately, but we must never wait
+/// forever: if the NIC misbehaves (or the emulator we're running on does), an
+/// unbounded loop here would hang the entire OS in a spin.
+/// See <https://github.com/theseus-os/Theseus/issues/960>.
+const MAX_POLL_ATTEMPTS:                   usize   = 500;
+/// How long we wait between two polling attempts, in microseconds.
+const POLL_INTERVAL_US:                    u32     = 1_000;
 
 
 
@@ -466,15 +478,16 @@ impl IxgbeNic {
         let mut pointers_to_queues = Vec::with_capacity(QUEUES_IN_MP);
 
         for i in 0..QUEUES_IN_MP {
-            // This is safe because we have checked that the number of queues we want to partition from these mapped pages fit into the allocated memory,
-            // and that each queue starts at the end of the previous.
-            // We also ensure that the backing mapped pages are included in the same struct as the registers, almost as a pseudo OwningRef
+            // Safety: we asserted above that the mapped pages are large enough to hold
+            // `QUEUES_IN_MP` register blocks, and each block begins exactly where the previous one ends.
+            // The `MmioPtr` only borrows the memory; the `backing_pages` field keeps the
+            // mapping alive for as long as this struct exists, so no one ever frees it early.
             let registers = unsafe {
-                Box::from_raw((starting_address.value() + (i * RX_QUEUE_REGISTERS_SIZE_BYTES)) as *mut RegistersRx)
+                MmioPtr::new((starting_address.value() + (i * RX_QUEUE_REGISTERS_SIZE_BYTES)) as *mut RegistersRx)
             };
             pointers_to_queues.push(
                 IxgbeRxQueueRegisters {
-                    regs: ManuallyDrop::new(registers),
+                    regs: registers,
                     backing_pages: shared_mp.clone()
                 }
             );
@@ -497,13 +510,14 @@ impl IxgbeNic {
         let mut pointers_to_queues = Vec::with_capacity(QUEUES_IN_MP);
 
         for i in 0..QUEUES_IN_MP {
-            // This is safe because we have checked that the number of queues we want to partition from these mapped pages fit into the allocated memory,
-            // and that each queue starts at the end of the previous.
-            // We also ensure that the backing mapped pages are included in the same struct as the registers, almost as a pseudo OwningRef
-            let registers = unsafe{ Box::from_raw((starting_address.value() + (i * TX_QUEUE_REGISTERS_SIZE_BYTES)) as *mut RegistersTx) };
+            // Safety: same reasoning as `mapped_regs_from_rx_memory` above — the pages are
+            // big enough, the blocks are contiguous, and `backing_pages` owns the mapping.
+            let registers = unsafe {
+                MmioPtr::new((starting_address.value() + (i * TX_QUEUE_REGISTERS_SIZE_BYTES)) as *mut RegistersTx)
+            };
             pointers_to_queues.push(
                 IxgbeTxQueueRegisters {
-                    regs: ManuallyDrop::new(registers),
+                    regs: registers,
                     backing_pages: shared_mp.clone()
                 }
             );
@@ -550,7 +564,9 @@ impl IxgbeNic {
             let end = hpet_ref.get_counter();
 
             let expiration_time = 10;
-            if (end-start) * period_fs / FS_PER_MS == expiration_time {
+            // `>=` rather than `==`: the counter can jump right over the exact
+            // expiration tick, and then we'd wait here forever.
+            if (end-start) * period_fs / FS_PER_MS >= expiration_time {
                 timer_expired_smbi = true;
                 break;
             }
@@ -571,7 +587,9 @@ impl IxgbeNic {
             let end = hpet_ref.get_counter();
 
             let expiration_time = 3000;
-            if (end-start) * period_fs / FS_PER_MS == expiration_time {
+            // `>=` rather than `==`: the counter can jump right over the exact
+            // expiration tick, and then we'd wait here forever.
+            if (end-start) * period_fs / FS_PER_MS >= expiration_time {
                 timer_expired_swesmbi = true;
                 break;
             }
@@ -670,18 +688,21 @@ impl IxgbeNic {
         regs1.eimc.write(DISABLE_INTERRUPTS);
 
         //wait for eeprom auto read completion
-        while !regs3.eec.read().get_bit(EEC_AUTO_RD as u8){}
+        Self::wait_for_bit(
+            || regs3.eec.read().get_bit(EEC_AUTO_RD as u8),
+            "eeprom auto-read completion (EEC.AUTO_RD)",
+        )?;
 
         //read MAC address
         debug!("Ixgbe: MAC address low: {:#X}", regs_mac.ral.read());
         debug!("Ixgbe: MAC address high: {:#X}", regs_mac.rah.read() & 0xFFFF);
 
         //wait for dma initialization done (RDRXCTL.DMAIDONE)
-        let mut val = regs2.rdrxctl.read();
         let dmaidone_bit = 1 << 3;
-        while val & dmaidone_bit != dmaidone_bit {
-            val = regs2.rdrxctl.read();
-        }
+        Self::wait_for_bit(
+            || regs2.rdrxctl.read() & dmaidone_bit == dmaidone_bit,
+            "dma initialization (RDRXCTL.DMAIDONE)",
+        )?;
 
         while Self::acquire_semaphore(regs3)? {
             //wait 10 ms
@@ -726,6 +747,26 @@ impl IxgbeNic {
             let _ = pit_clock_basic::pit_wait(wait_time); // wait, or try again regardless
             tries += 1;
         }
+    }
+
+    /// Polls `condition` until it holds, pausing briefly between attempts, and
+    /// gives up with `what` if it never becomes true within `MAX_POLL_ATTEMPTS` tries.
+    ///
+    /// Every wait on hardware has to be bounded: a device that never sets the bit
+    /// we're waiting for should produce an error we can report, not a driver that
+    /// spins forever and takes the system down with it.
+    fn wait_for_bit<F>(mut condition: F, what: &'static str) -> Result<(), &'static str>
+    where
+        F: FnMut() -> bool,
+    {
+        for _ in 0..MAX_POLL_ATTEMPTS {
+            if condition() {
+                return Ok(());
+            }
+            pit_clock_basic::pit_wait(POLL_INTERVAL_US)?;
+        }
+        error!("ixgbe: timed out waiting for {what}");
+        Err(what)
     }
 
     /// Clear the statistic registers by reading from them.
@@ -795,7 +836,10 @@ impl IxgbeNic {
             rxq.rxdctl.write(val | RX_Q_ENABLE);
 
             //make sure queue is enabled
-            while rxq.rxdctl.read() & RX_Q_ENABLE == 0 {}
+            Self::wait_for_bit(
+                || (rxq.rxdctl.read() & RX_Q_ENABLE) != 0,
+                "rx queue enable (RXDCTL.ENABLE)",
+            )?;
         
             // set bit 12 to 0
             let val = rxq.dca_rxctrl.read();
@@ -883,7 +927,10 @@ impl IxgbeNic {
             txq.txdctl.write(val | TX_Q_ENABLE); 
 
             //make sure queue is enabled
-            while txq.txdctl.read() & TX_Q_ENABLE == 0 {} 
+            Self::wait_for_bit(
+                || (txq.txdctl.read() & TX_Q_ENABLE) != 0,
+                "tx queue enable (TXDCTL.ENABLE)",
+            )?;
 
             tx_descs_all_queues.push(tx_descs);
         }

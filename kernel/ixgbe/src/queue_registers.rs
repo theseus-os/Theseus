@@ -4,22 +4,65 @@
 //! the registers to be accessed through virtual NICs
 
 use super::regs::{RegistersRx, RegistersTx};
-use alloc::{
-    sync::Arc,
-    boxed::Box
-};
+use alloc::sync::Arc;
 use core::ops::{Deref, DerefMut};
-use core::mem::ManuallyDrop;
+use core::ptr::NonNull;
 use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 use memory::MappedPages;
+
+
+/// A non-null pointer to a register block that lives in MMIO memory,
+/// i.e. memory that was mapped from one of the NIC's BARs.
+///
+/// We deliberately do *not* use a `Box` for this: the pointed-to memory comes
+/// from a `MappedPages` mapping, not from the heap, so a `Box` would be invalid
+/// from the start (the global allocator never handed out this memory) and
+/// dropping it would run the deallocator on MMIO memory.
+/// A plain pointer has no destructor at all, which also closes the window where
+/// an unwinding task could have freed the registers by mistake.
+#[derive(Debug)]
+pub struct MmioPtr<T>(NonNull<T>);
+
+impl<T> MmioPtr<T> {
+    /// Creates a pointer from the raw address of a mapped register block.
+    ///
+    /// # Safety
+    /// `ptr` must be non-null, properly aligned for `T`, and must stay mapped
+    /// for as long as the returned pointer is used. The usual way to guarantee
+    /// the last part is to keep the owning `MappedPages` alive alongside it.
+    pub unsafe fn new(ptr: *mut T) -> Self {
+        Self(NonNull::new(ptr).expect("null pointer passed to MmioPtr::new"))
+    }
+}
+
+impl<T> Deref for MmioPtr<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        // Safety: guaranteed by `new()` and by whoever owns this pointer,
+        // which also holds the `MappedPages` backing the mapping.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl<T> DerefMut for MmioPtr<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { self.0.as_mut() }
+    }
+}
+
+// A `MmioPtr` is only a handle to memory owned elsewhere, so it can be sent or
+// shared exactly when the pointee can be, just like the `Box` it replaces.
+unsafe impl<T: Send> Send for MmioPtr<T> {}
+unsafe impl<T: Sync> Sync for MmioPtr<T> {}
 
 
 /// Struct that stores a pointer to registers for one ixgbe receive queue
 /// as well as a shared reference to the backing `MappedPages` where these registers are located.
 pub struct IxgbeRxQueueRegisters {
-    /// We prevent the drop handler from dropping the `regs` because the backing memory is not in the heap,
-    /// but in the stored mapped pages. The memory will be deallocated when the `backing_pages` are dropped.
-    pub regs: ManuallyDrop<Box<RegistersRx>>,
+    /// The registers themselves, living inside `backing_pages`.
+    /// Nothing here is ever dropped or freed; the mapping is torn down only
+    /// when the last `backing_pages` reference goes away.
+    pub regs: MmioPtr<RegistersRx>,
     pub backing_pages: Arc<MappedPages>
 }
 
@@ -41,13 +84,13 @@ impl RxQueueRegisters for IxgbeRxQueueRegisters {
     }
 }
 impl Deref for IxgbeRxQueueRegisters {
-    type Target = Box<RegistersRx>;
-    fn deref(&self) -> &Box<RegistersRx> {
+    type Target = RegistersRx;
+    fn deref(&self) -> &RegistersRx {
         &self.regs
     }
 }
 impl DerefMut for IxgbeRxQueueRegisters {
-    fn deref_mut(&mut self) -> &mut Box<RegistersRx> {
+    fn deref_mut(&mut self) -> &mut RegistersRx {
         &mut self.regs
     }
 }
@@ -55,9 +98,10 @@ impl DerefMut for IxgbeRxQueueRegisters {
 /// Struct that stores a pointer to registers for one ixgbe transmit queue
 /// as well as a shared reference to the backing `MappedPages` where these registers are located.
 pub struct IxgbeTxQueueRegisters {
-    /// We prevent the drop handler from dropping the `regs` because the backing memory is not in the heap,
-    /// but in the stored mapped pages. The memory will be deallocated when the `backing_pages` are dropped.
-    pub regs: ManuallyDrop<Box<RegistersTx>>,
+    /// The registers themselves, living inside `backing_pages`.
+    /// Nothing here is ever dropped or freed; the mapping is torn down only
+    /// when the last `backing_pages` reference goes away.
+    pub regs: MmioPtr<RegistersTx>,
     pub backing_pages: Arc<MappedPages>
 }
 impl TxQueueRegisters for IxgbeTxQueueRegisters {
@@ -78,13 +122,13 @@ impl TxQueueRegisters for IxgbeTxQueueRegisters {
     }
 }
 impl Deref for IxgbeTxQueueRegisters {
-    type Target = Box<RegistersTx>;
-    fn deref(&self) -> &Box<RegistersTx> {
+    type Target = RegistersTx;
+    fn deref(&self) -> &RegistersTx {
         &self.regs
     }
 }
 impl DerefMut for IxgbeTxQueueRegisters {
-    fn deref_mut(&mut self) -> &mut Box<RegistersTx> {
+    fn deref_mut(&mut self) -> &mut RegistersTx {
         &mut self.regs
     }
 }

@@ -6,7 +6,6 @@
 #![feature(core_intrinsics)]
 #![feature(linkage)]
 #![feature(thread_local)]
-#![feature(const_btree_new)]
 
 // Allowances for C-style syntax.
 #![allow(non_upper_case_globals)]
@@ -27,6 +26,7 @@ extern crate memory;
 extern crate task;
 extern crate cstr_core;
 extern crate core2;
+extern crate app_io;
 
 
 mod errno;
